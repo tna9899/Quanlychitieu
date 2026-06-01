@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản Lý Chi Tiêu Tháng</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f7f6; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; }
+        .flex-inputs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        input, select, button { padding: 10px; font-size: 16px; border: 1px solid #ddd; border-radius: 4px; }
+        input[type="number"] { width: 130px; }
+        button { background-color: #28a745; color: white; border: none; cursor: pointer; }
+        button:hover { background-color: #218838; }
+        .summary { display: flex; justify-content: space-between; margin-bottom: 20px; font-weight: bold; font-size: 18px; }
+        .thu { color: #28a745; }
+        .chi { color: #dc3545; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .btn-delete { background-color: #dc3545; padding: 5px 10px; font-size: 12px; }
+        .btn-delete:hover { background-color: #c82333; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Quản Lý Chi Tiêu Trong Tháng</h2>
+    
+    <div class="flex-inputs">
+        <input type="date" id="date">
+        <select id="type">
+            <option value="chi">Khoản Chi (-)</option>
+            <option value="thu">Khoản Thu (+)</option>
+        </select>
+        <input type="text" id="category" placeholder="Danh mục (Ăn uống, Lương...)">
+        <input type="number" id="amount" placeholder="Số tiền (đ)">
+        <input type="text" id="note" placeholder="Ghi chú">
+        <button onclick="addTransaction()">Thêm</button>
+    </div>
+
+    <div class="summary">
+        <div>Tổng Thu: <span id="total-thu" class="thu">0đ</span></div>
+        <div>Tổng Chi: <span id="total-chi" class="chi">0đ</span></div>
+        <div>Còn Lại: <span id="total-balance">0đ</span></div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Ngày</th>
+                <th>Loại</th>
+                <th>Danh mục</th>
+                <th>Số tiền</th>
+                <th>Ghi chú</th>
+                <th>Hành động</th>
+            </tr>
+        </thead>
+        <tbody id="transaction-table-body">
+            </tbody>
+    </table>
+</div>
+
+<script>
+    // Tự động chọn ngày hôm nay làm mặc định
+    document.getElementById('date').valueAsDate = new Date();
+
+    async function loadTransactions() {
+        const res = await fetch('/api/transactions');
+        const data = await res.json();
+        
+        const tbody = document.getElementById('transaction-table-body');
+        tbody.innerHTML = '';
+        
+        let totalThu = 0;
+        let totalChi = 0;
+
+        data.forEach(t => {
+            if(t.type === 'thu') totalThu += t.amount;
+            else totalChi += t.amount;
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${t.date}</td>
+                <td class="${t.type}">${t.type === 'thu' ? 'Thu nhập' : 'Chi tiêu'}</td>
+                <td>${t.category}</td>
+                <td class="${t.type}">${t.type === 'thu' ? '+' : '-'}${t.amount.toLocaleString()} đ</td>
+                <td>${t.note || ''}</td>
+                <td><button class="btn-delete" onclick="deleteTransaction(${t.id})">Xóa</button></td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        document.getElementById('total-thu').innerText = totalThu.toLocaleString() + ' đ';
+        document.getElementById('total-chi').innerText = totalChi.toLocaleString() + ' đ';
+        
+        const balance = totalThu - totalChi;
+        const balanceEl = document.getElementById('total-balance');
+        balanceEl.innerText = balance.toLocaleString() + ' đ';
+        balanceEl.className = balance >= 0 ? 'thu' : 'chi';
+    }
+
+    async function addTransaction() {
+        const date = document.getElementById('date').value;
+        const type = document.getElementById('type').value;
+        const category = document.getElementById('category').value;
+        const amount = document.getElementById('amount').value;
+        const note = document.getElementById('note').value;
+
+        if (!category || !amount) {
+            alert('Vui lòng nhập đầy đủ Danh mục và Số tiền!');
+            return;
+        }
+
+        await fetch('/api/transactions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date, type, category, amount, note })
+        });
+
+        // Reset form nhập chữ
+        document.getElementById('category').value = '';
+        document.getElementById('amount').value = '';
+        document.getElementById('note').value = '';
+        
+        loadTransactions();
+    }
+
+    async function deleteTransaction(id) {
+        if(confirm('Bạn có chắc chắn muốn xóa mục này?')) {
+            await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
+            loadTransactions();
+        }
+    }
+
+    // Chạy tải dữ liệu khi vừa mở trang web
+    loadTransactions();
+</script>
+</body>
+</html>
