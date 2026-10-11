@@ -202,7 +202,7 @@ class ExpenditureApp:
         
         # --- CẤU HÌNH KÍCH THƯỚC VÀ CĂN GIỮA MÀN HÌNH ---
         window_width = 390
-        window_height = 590
+        window_height = 610
         
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
@@ -560,7 +560,7 @@ class ExpenditureApp:
         )
         self.status_msg.pack(pady=(6, 2))
 
-        # E. DÒNG CHỮ KÝ THIẾT KẾ (FOOTER)
+        # E. DÒNG CHỮ KÝ THIẾT KẾ & LIÊN KẾT WEB APP (FOOTER)
         self.designer_label = tk.Label(
             main_container,
             text="Designed & Developed by Trinh Ngoc Anh",
@@ -568,7 +568,18 @@ class ExpenditureApp:
             fg="#94A3B8",
             bg="#F8FAFC"
         )
-        self.designer_label.pack(side=tk.BOTTOM, pady=(4, 0))
+        self.designer_label.pack(side=tk.BOTTOM, pady=(2, 0))
+
+        self.web_link_btn = tk.Label(
+            main_container,
+            text="📱 Web nhập liệu (Mobile): tna9899.github.io/Quanlychitieu",
+            font=("Segoe UI", 8, "underline"),
+            fg="#2563EB",
+            bg="#F8FAFC",
+            cursor="hand2"
+        )
+        self.web_link_btn.pack(side=tk.BOTTOM, pady=(4, 0))
+        self.web_link_btn.bind("<Button-1>", lambda e: webbrowser.open("https://tna9899.github.io/Quanlychitieu/"))
 
         # Gán phím Enter để xác nhận Thêm & Đồng bộ (hỗ trợ cả phím Enter chính và Numpad Enter)
         self.root.bind("<Return>", self._handle_enter_key)

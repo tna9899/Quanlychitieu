@@ -5,6 +5,10 @@ Hệ thống quản lý chi tiêu cá nhân thông minh, hỗ trợ nhập liệ
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20iOS%20%7C%20Android-green.svg)
 ![Storage](https://img.shields.io/badge/Storage-Google%20Sheets-success.svg)
+[![Live Web App](https://img.shields.io/badge/Web%20App-Online%20(GitHub%20Pages)-success?logo=github)](https://tna9899.github.io/Quanlychitieu/)
+
+> 📱 **Trang Web nhập chi tiêu trực tuyến trên điện thoại / máy tính khác:**  
+> 👉 [**https://tna9899.github.io/Quanlychitieu/**](https://tna9899.github.io/Quanlychitieu/)
 
 ---
 
