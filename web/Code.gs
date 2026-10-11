@@ -262,6 +262,34 @@ function addNewTransactionRecord(dateStr, category, amount, note) {
 }
 
 /**
+ * Tìm sheet tháng một cách linh hoạt (hỗ trợ cả "Tháng 06-2026", "Tháng 6-2026", "Tháng 06", "Tháng 6")
+ */
+function findSheetForMonth(ss, m, year) {
+  const mPad = String(m).padStart(2, "0");
+  const mRaw = String(m);
+  const possibleNames = [
+    "Tháng " + mPad + "-" + year,
+    "Tháng " + mRaw + "-" + year,
+    "Tháng " + mPad,
+    "Tháng " + mRaw
+  ];
+  for (let i = 0; i < possibleNames.length; i++) {
+    const s = ss.getSheetByName(possibleNames[i]);
+    if (s) return s;
+  }
+  const allSheets = ss.getSheets();
+  for (let i = 0; i < allSheets.length; i++) {
+    const name = allSheets[i].getName().trim().toLowerCase();
+    for (let j = 0; j < possibleNames.length; j++) {
+      if (name === possibleNames[j].toLowerCase()) {
+        return allSheets[i];
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Tính toán tiền tiết kiệm cộng dồn từ Tháng 06 đến tháng hiện tại
  */
 function calculateCumulativeSavings(ss, year, currentMonthNum) {
@@ -278,8 +306,7 @@ function calculateCumulativeSavings(ss, year, currentMonthNum) {
   let cumulative = 0;
 
   for (let m = START_MONTH; m <= currentMonthNum; m++) {
-    const sName = "Tháng " + String(m).padStart(2, "0") + "-" + year;
-    const s = ss.getSheetByName(sName);
+    const s = findSheetForMonth(ss, m, year);
     if (!s) continue;
     const lRow = s.getLastRow();
     if (lRow < 2) continue;
@@ -335,7 +362,10 @@ function getMonthData(year, month) {
     }
   } catch (e) {}
 
-  const sheet = ss.getSheetByName(sheetName);
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = findSheetForMonth(ss, numMonth, year);
+  }
   if (!sheet) {
     const cumData = calculateCumulativeSavings(ss, year, numMonth);
     return {

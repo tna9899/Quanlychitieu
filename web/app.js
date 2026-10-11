@@ -631,6 +631,11 @@ async function syncMonthDataFromServer(isSilent = false) {
         if (storedEmail) updateConnectedEmail(storedEmail);
       }
 
+      // Lưu mức tích lũy cơ sở từ Tháng 6 đến trước tháng hiện tại
+      const netSavings = data.monthSavings !== undefined ? data.monthSavings : ((data.totalIncome || 0) - (data.total || 0));
+      const priorBase = (data.cumulativeSavings || 0) - netSavings;
+      localStorage.setItem(`qly_cum_prior_${currentYear}_${currentMonth}`, String(priorBase));
+
       // Cập nhật cache local
       saveMonthCache(data);
 
@@ -651,7 +656,7 @@ async function syncMonthDataFromServer(isSilent = false) {
         monthTransactions.length,
         data.totalIncome || 0,
         data.total || 0,
-        data.monthSavings !== undefined ? data.monthSavings : ((data.totalIncome || 0) - (data.total || 0))
+        netSavings
       );
     } else {
       throw new Error(data && data.error ? data.error : "Phản hồi không hợp lệ từ máy chủ");
@@ -691,7 +696,13 @@ function getCacheKey(year = currentYear, month = currentMonth) {
 
 function saveMonthCache(data) {
   try {
-    localStorage.setItem(getCacheKey(), JSON.stringify(data));
+    const existingRaw = localStorage.getItem(getCacheKey());
+    let existing = {};
+    if (existingRaw) {
+      try { existing = JSON.parse(existingRaw); } catch (e) {}
+    }
+    const merged = Object.assign({}, existing, data);
+    localStorage.setItem(getCacheKey(), JSON.stringify(merged));
   } catch (e) {}
 }
 
@@ -723,35 +734,45 @@ function computeCumulativeSavingsLocally() {
     };
   }
 
-  let cumulative = 0;
+  // Tính thặng dư thu - chi của tháng hiện tại
+  let currentMonthSavings = 0;
+  let inc = 0;
+  let exp = 0;
+  monthTransactions.forEach(t => {
+    const isInc = t.type === "income" || t.category === "Tiền lương" || t.category === "Lương" || t.category === "Thu nhập";
+    if (isInc) inc += (t.amount || 0);
+    else exp += (t.amount || 0);
+  });
+  currentMonthSavings = inc - exp;
 
-  for (let m = START_SAVINGS_MONTH; m <= currentMonth; m++) {
-    const raw = localStorage.getItem(getCacheKey(currentYear, m));
-    let mSavings = 0;
+  if (currentMonth === START_SAVINGS_MONTH) {
+    return {
+      cumulativeSavings: currentMonthSavings,
+      savingsStartMonth: START_SAVINGS_MONTH
+    };
+  }
 
-    if (raw) {
-      try {
-        const d = JSON.parse(raw);
-        const inc = d.totalIncome || 0;
-        const exp = d.total || 0;
-        mSavings = d.monthSavings !== undefined ? d.monthSavings : (inc - exp);
-      } catch (e) {}
-    } else if (m === currentMonth && monthTransactions.length > 0) {
-      let inc = 0;
-      let exp = 0;
-      monthTransactions.forEach(t => {
-        const isInc = t.type === "income" || t.category === "Tiền lương" || t.category === "Lương" || t.category === "Thu nhập";
-        if (isInc) inc += (t.amount || 0);
-        else exp += (t.amount || 0);
-      });
-      mSavings = inc - exp;
+  // Nếu tháng hiện tại > Tháng 6: Lũy kế = (Tích lũy từ Tháng 6 đến Tháng (currentMonth - 1)) + Thặng dư tháng này
+  const storedPrior = localStorage.getItem(`qly_cum_prior_${currentYear}_${currentMonth}`);
+  let priorBase = 0;
+  if (storedPrior !== null && !isNaN(Number(storedPrior))) {
+    priorBase = Number(storedPrior);
+  } else {
+    for (let m = START_SAVINGS_MONTH; m < currentMonth; m++) {
+      const raw = localStorage.getItem(getCacheKey(currentYear, m));
+      if (raw) {
+        try {
+          const d = JSON.parse(raw);
+          const mInc = d.totalIncome || 0;
+          const mExp = d.total || 0;
+          priorBase += (d.monthSavings !== undefined ? d.monthSavings : (mInc - mExp));
+        } catch (e) {}
+      }
     }
-
-    cumulative += mSavings;
   }
 
   return {
-    cumulativeSavings: cumulative,
+    cumulativeSavings: priorBase + currentMonthSavings,
     savingsStartMonth: START_SAVINGS_MONTH
   };
 }
@@ -872,8 +893,17 @@ function renderTransactionsList() {
     return;
   }
 
-  // Hiển thị giao dịch mới nhất lên trên
-  const sorted = [...filtered].reverse();
+  // Sắp xếp thứ tự ngày giảm dần (ngày mới nhất lên trên cùng)
+  const sorted = [...filtered].sort((a, b) => {
+    const dateA = a.date || "";
+    const dateB = b.date || "";
+    if (dateA !== dateB) {
+      return dateB.localeCompare(dateA);
+    }
+    return (b.row || 999999) - (a.row || 999999);
+  });
+
+  const isAllFilter = (activeCatFilter === "ALL");
 
   transactionsContainer.innerHTML = sorted.map(item => {
     const isIncome = item.type === "income" || item.category === "Tiền lương" || item.category === "Lương";
@@ -881,17 +911,25 @@ function renderTransactionsList() {
     const amountSign = isIncome ? "+" : "-";
     const amountClass = isIncome ? "trans-pill-amount is-income" : "trans-pill-amount is-expense";
 
-    // Format ngày ngắn gọn (MM-dd)
+    // Format thứ tự ngày chuẩn Việt Nam (dd/MM: Ngày trước, Tháng sau)
     let dateDisplay = item.date || "";
-    if (dateDisplay.length >= 10) {
-      dateDisplay = dateDisplay.substring(5); // Lấy MM-dd
+    if (dateDisplay.includes("-")) {
+      const parts = dateDisplay.split("-");
+      if (parts.length === 3) {
+        dateDisplay = `${parts[2].padStart(2, "0")}/${parts[1].padStart(2, "0")}`;
+      }
+    } else if (dateDisplay.includes("/")) {
+      const parts = dateDisplay.split("/");
+      if (parts.length >= 2) {
+        dateDisplay = `${parts[0].padStart(2, "0")}/${parts[1].padStart(2, "0")}`;
+      }
     }
 
     return `
       <div class="transaction-row-single" data-row="${item.row || ''}">
         <div class="trans-single-left">
           <span class="trans-pill-date">${escapeHtml(dateDisplay)}</span>
-          <span class="trans-pill-cat">${icon} ${escapeHtml(item.category)}</span>
+          ${isAllFilter ? `<span class="trans-pill-cat">${icon} ${escapeHtml(item.category)}</span>` : ""}
           ${item.note ? `<span class="trans-pill-note" title="${escapeHtml(item.note)}">📝 ${escapeHtml(item.note)}</span>` : ""}
         </div>
         <div class="trans-single-right">
