@@ -57,13 +57,13 @@ body {
 
 .app-container {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1600px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding-left: 16px;
-  padding-right: 16px;
+  padding-left: 20px;
+  padding-right: 20px;
   box-sizing: border-box;
   padding-bottom: 4px;
 }
@@ -178,16 +178,24 @@ body {
 /* ================== BỐ CỤC 2 CỘT (DASHBOARD GRID) ================== */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 380px 1fr;
-  gap: 16px;
+  grid-template-columns: 440px 1fr;
+  gap: 20px;
   align-items: start;
   width: 100%;
   min-width: 0;
 }
 
+@media (max-width: 1100px) {
+  .dashboard-grid {
+    grid-template-columns: 390px 1fr;
+    gap: 16px;
+  }
+}
+
 @media (max-width: 900px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
+    gap: 14px;
   }
 }
 
@@ -741,6 +749,7 @@ body {
   align-items: center;
   font-size: 0.78rem;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .breakdown-bar-bg {
@@ -945,16 +954,21 @@ body {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .stat-label {
-  font-size: 0.68rem;
-  opacity: 0.9;
+  font-size: 0.72rem;
+  opacity: 0.95;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .stat-value {
-  font-size: 1.02rem;
+  font-size: 1.05rem;
   font-weight: 800;
   letter-spacing: -0.3px;
   white-space: nowrap;
@@ -993,33 +1007,41 @@ body {
   color: #1e293b;
   margin-bottom: 12px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
 }
 
 .cum-left {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .cum-icon {
   font-size: 1.35rem;
+  flex-shrink: 0;
 }
 
 .cum-title {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: #0f172a;
+  white-space: nowrap;
 }
 
 .cum-subtitle {
-  font-size: 0.65rem;
+  font-size: 0.68rem;
   color: #64748b;
+  white-space: nowrap;
 }
 
 .cum-amount {
   font-size: 1.18rem;
   font-weight: 800;
   color: #059669;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .cum-amount.is-negative {
@@ -1032,6 +1054,7 @@ body {
   align-items: center;
   gap: 6px;
   overflow: hidden;
+  white-space: nowrap;
 }
 
 .btn-badge-action {
@@ -1196,12 +1219,15 @@ body {
   align-items: center;
   font-size: 0.75rem;
   color: #475569;
+  white-space: nowrap;
+  gap: 12px;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
   gap: 5px;
+  white-space: nowrap;
 }
 
 .legend-dot {
@@ -1244,6 +1270,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  white-space: nowrap;
 }
 
 .ss-title {
@@ -1253,6 +1280,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
 }
 
 .ss-amount {
