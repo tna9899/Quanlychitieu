@@ -32,7 +32,18 @@ function doGet(e) {
 
   // 1. Kiểm tra kết nối
   if (action === "ping") {
-    return createJsonResponse({ status: "ok", message: "Google Apps Script đang hoạt động ổn định!" });
+    try {
+      const now = new Date();
+      const ss = getOrCreateSpreadsheet(now.getFullYear());
+      return createJsonResponse({
+        status: "ok",
+        message: "Google Apps Script đang hoạt động ổn định!",
+        spreadsheetUrl: ss.getUrl(),
+        spreadsheetId: ss.getId()
+      });
+    } catch(err) {
+      return createJsonResponse({ status: "ok", message: "Google Apps Script đang hoạt động ổn định!" });
+    }
   }
 
   // 2. Lấy toàn bộ danh sách chi tiêu và thống kê trong tháng
@@ -153,7 +164,8 @@ function doPost(e) {
       success: true,
       message: "Đã thêm chi tiêu thành công!",
       row: nextRow,
-      monthTotal: typeof newTotal === "number" ? newTotal : amount
+      monthTotal: typeof newTotal === "number" ? newTotal : amount,
+      spreadsheetUrl: ss.getUrl()
     });
   } catch (error) {
     return createJsonResponse({
@@ -187,6 +199,8 @@ function getMonthData(year, month) {
       year: year,
       month: month,
       sheetName: sheetName,
+      spreadsheetUrl: ss.getUrl(),
+      spreadsheetId: ss.getId(),
       total: 0,
       count: 0,
       categories: FIXED_CATEGORIES.map(c => ({ name: c, total: 0 })),
@@ -253,6 +267,8 @@ function getMonthData(year, month) {
     year: year,
     month: month,
     sheetName: sheetName,
+    spreadsheetUrl: ss.getUrl(),
+    spreadsheetId: ss.getId(),
     total: totalVal,
     count: transactions.length,
     categories: catSummary,

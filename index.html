@@ -28,6 +28,7 @@
           <span class="status-dot"></span>
           <span id="statusText">Chưa kết nối</span>
         </div>
+        <button id="btnOpenSheet" class="btn-icon btn-sheet" title="Mở bảng tính Google Sheets">📊</button>
         <button id="btnSettings" class="btn-icon" title="Cấu hình kết nối">⚙️</button>
       </div>
     </header>
@@ -167,6 +168,12 @@
             <span id="listTitleMonth">Các khoản chi trong tháng</span>
           </div>
           <span id="listTotalHeader" style="font-size: 0.85rem; color: #b91c1c; font-weight: 700;">0 ₫</span>
+        </div>
+
+        <!-- Thanh liên kết Google Sheets & Trạng thái cập nhật -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 6px 10px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+          <a id="linkOpenSheet" href="#" target="_blank" class="btn-open-sheet-tag">📊 Mở Google Sheet ↗</a>
+          <span id="lastSyncTimeText" style="font-size: 0.72rem; color: #64748b;">⏳ Đang đồng bộ...</span>
         </div>
 
         <!-- Bộ lọc & Tìm kiếm -->

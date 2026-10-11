@@ -109,6 +109,36 @@ body {
   color: var(--text-main);
 }
 
+.btn-sheet {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.btn-sheet:hover {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.btn-open-sheet-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.btn-open-sheet-tag:hover {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+}
+
 /* Status Banner */
 .status-pill {
   display: inline-flex;

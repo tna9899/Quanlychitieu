@@ -12,6 +12,7 @@ const CATEGORY_ICONS = {
 
 const STORAGE_KEYS = {
   API_URL: "qly_expense_api_url",
+  SHEET_URL: "qly_expense_sheet_url",
   LAST_YEAR: "qly_expense_selected_year",
   LAST_MONTH: "qly_expense_selected_month"
 };
@@ -36,6 +37,10 @@ const listTitleMonth = document.getElementById("listTitleMonth");
 const tabCountBadge = document.getElementById("tabCountBadge");
 const btnSyncServer = document.getElementById("btnSyncServer");
 const syncText = document.getElementById("syncText");
+
+const btnOpenSheet = document.getElementById("btnOpenSheet");
+const linkOpenSheet = document.getElementById("linkOpenSheet");
+const lastSyncTimeText = document.getElementById("lastSyncTimeText");
 
 const connectionStatus = document.getElementById("connectionStatus");
 const statusText = document.getElementById("statusText");
@@ -89,18 +94,46 @@ function initApp() {
 
   updateMonthDisplay();
 
-  // Đọc URL đã lưu
+  // Đọc URL Google Apps Script đã lưu
   const savedUrl = (localStorage.getItem(STORAGE_KEYS.API_URL) || "").trim();
   apiUrlInput.value = savedUrl;
   updateConnectionUI(Boolean(savedUrl));
 
+  // Đọc URL Google Sheets đã lưu
+  const savedSheetUrl = localStorage.getItem(STORAGE_KEYS.SHEET_URL);
+  if (savedSheetUrl) {
+    updateSpreadsheetLinks(savedSheetUrl);
+  }
+
   // Tải dữ liệu từ cache local trước để hiển thị tức thì
   loadMonthCache();
 
-  // Đồng bộ dữ liệu mới nhất từ Google Sheets
+  // Tự động đồng bộ ngay lập tức từ Google Sheets khi mở web
   if (savedUrl) {
-    syncMonthDataFromServer();
+    if (lastSyncTimeText) {
+      lastSyncTimeText.innerText = "⏳ Đang tự động cập nhật Drive...";
+    }
+    syncMonthDataFromServer(false);
+  } else {
+    if (lastSyncTimeText) {
+      lastSyncTimeText.innerText = "Chưa kết nối Google Apps Script";
+    }
   }
+}
+
+function updateSpreadsheetLinks(url) {
+  if (linkOpenSheet) {
+    linkOpenSheet.href = url || "https://docs.google.com/spreadsheets/u/0/";
+  }
+}
+
+function openGoogleSheet() {
+  const url = localStorage.getItem(STORAGE_KEYS.SHEET_URL) || "https://docs.google.com/spreadsheets/u/0/";
+  window.open(url, "_blank");
+}
+
+if (btnOpenSheet) {
+  btnOpenSheet.addEventListener("click", openGoogleSheet);
 }
 
 // Cập nhật nhãn tháng trên giao diện
@@ -192,7 +225,7 @@ categoryOptions.forEach((opt) => {
 });
 
 // --- 3. ĐỒNG BỘ DỮ LIỆU TỪ GOOGLE SHEETS ---
-async function syncMonthDataFromServer() {
+async function syncMonthDataFromServer(isSilent = false) {
   const apiUrl = (localStorage.getItem(STORAGE_KEYS.API_URL) || "").trim();
   if (!apiUrl) {
     updateConnectionUI(false);
@@ -212,18 +245,37 @@ async function syncMonthDataFromServer() {
       monthTransactions = data.transactions || [];
       categoryTotals = data.categories || [];
 
+      // Lưu URL Google Sheets nếu có trong phản hồi
+      if (data.spreadsheetUrl) {
+        localStorage.setItem(STORAGE_KEYS.SHEET_URL, data.spreadsheetUrl);
+        updateSpreadsheetLinks(data.spreadsheetUrl);
+      }
+
       // Cập nhật cache local
       saveMonthCache(data);
 
       // Render lại giao diện
       renderAllViews(data.total);
       updateConnectionUI(true);
+
+      const timeStr = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+      if (lastSyncTimeText) {
+        lastSyncTimeText.innerText = `✅ Đã đồng bộ Drive (${timeStr})`;
+      }
+      if (statusText) {
+        statusText.innerText = `Đã đồng bộ (${timeStr})`;
+      }
     } else {
       throw new Error(data.error || "Không thể nạp dữ liệu từ Google Sheets");
     }
   } catch (err) {
     console.warn("Lỗi đồng bộ từ server:", err);
-    showToast("Không thể tải dữ liệu từ Google Sheets: " + err.message, "error");
+    if (!isSilent) {
+      showToast("Không thể tải dữ liệu từ Google Sheets: " + err.message, "error");
+    }
+    if (lastSyncTimeText) {
+      lastSyncTimeText.innerText = "⚠️ Lỗi đồng bộ dữ liệu";
+    }
   } finally {
     setSyncingState(false);
   }
@@ -590,3 +642,23 @@ function escapeHtml(str) {
 
 // Khởi chạy khi tài liệu sẵn sàng
 initApp();
+
+// --- 8. TỰ ĐỘNG CẬP NHẬT DỮ LIỆU TỪ GOOGLE DRIVE ---
+// Tự động đồng bộ mỗi khi người dùng chuyển lại vào trang web hoặc mở màn hình
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    syncMonthDataFromServer(true);
+  }
+});
+
+// Tự động đồng bộ khi cửa sổ trình duyệt nhận focus
+window.addEventListener("focus", () => {
+  syncMonthDataFromServer(true);
+});
+
+// Tự động kiểm tra cập nhật ngầm mỗi 60 giây khi trang web đang mở
+setInterval(() => {
+  if (document.visibilityState === "visible") {
+    syncMonthDataFromServer(true);
+  }
+}, 60000);
