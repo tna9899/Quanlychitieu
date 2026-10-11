@@ -71,7 +71,8 @@
               <div class="stat-value text-red" id="totalExpenseAmount">- 0 ₫</div>
             </div>
             <div class="stat-box stat-savings">
-              <div class="stat-label">💰 Tiết kiệm tháng</div>
+              <div class="stat-label">💰 Tiền tiết kiệm</div>
+              <div style="font-size: 0.62rem; opacity: 0.85; margin-bottom: 2px;">(= Lương - Chi tiêu)</div>
               <div class="stat-value" id="monthSavingsAmount">0 ₫</div>
             </div>
           </div>
@@ -173,7 +174,7 @@
 
       <!-- CỘT PHẢI (RIGHT) -->
       <div class="col-right">
-        <!-- Thẻ Thống Kê Cơ Cấu Danh Mục -->
+        <!-- Thẻ Thống Kê Cơ Cấu Danh Mục Chi Tiêu -->
         <section class="card">
           <div class="card-title">
             <span>📊</span>
@@ -182,6 +183,34 @@
 
           <div class="breakdown-grid" id="categoryBreakdownContainer">
             <div class="empty-state">Chưa có dữ liệu thống kê tháng này.</div>
+          </div>
+        </section>
+
+        <!-- Thẻ Cơ Cấu Tiền Lương & Tiết Kiệm (Tách riêng thành 1 cơ cấu độc lập) -->
+        <section class="card">
+          <div class="card-title" style="justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span>⚖️</span>
+              <span>Cơ cấu Tiền lương & Tiết kiệm</span>
+            </div>
+            <span id="savingsRateBadge" class="savings-rate-badge">0% tiết kiệm</span>
+          </div>
+
+          <!-- Thanh tỷ lệ trực quan: Chi tiêu (%) vs Tiết kiệm (%) so với Tiền lương -->
+          <div class="financial-ratio-bar-wrapper">
+            <div class="ratio-bar-container">
+              <div id="ratioBarExpense" class="ratio-bar-fill fill-expense" style="width: 0%;" title="Chi tiêu"></div>
+              <div id="ratioBarSavings" class="ratio-bar-fill fill-savings" style="width: 0%;" title="Tiết kiệm"></div>
+            </div>
+            <div class="ratio-legend">
+              <span class="legend-item"><span class="legend-dot dot-expense"></span> Chi tiêu: <strong id="ratioExpensePercent">0%</strong></span>
+              <span class="legend-item"><span class="legend-dot dot-savings"></span> Tiết kiệm (= Lương - Chi tiêu): <strong id="ratioSavingsPercent">0%</strong></span>
+            </div>
+          </div>
+
+          <!-- Danh sách phân tích 2 khoản: Tiền lương & Tiết kiệm -->
+          <div class="salary-savings-grid" id="salarySavingsBreakdownContainer">
+            <!-- Sẽ được app.js render tự động -->
           </div>
         </section>
 
