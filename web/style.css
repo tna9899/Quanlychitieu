@@ -1528,10 +1528,10 @@ body {
   .stat-savings {
     grid-column: 1 / -1;
     display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    padding: 9px 12px;
+    flex-direction: column;
+    justify-content: center;
+    padding: 8px 10px;
+    gap: 3px;
   }
 
   .stat-label {
@@ -1681,9 +1681,12 @@ body {
   }
 
   .transaction-row-single {
-    padding: 7px 8px;
-    min-height: 36px;
-    gap: 6px;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 8px 10px;
+    min-height: auto;
+    gap: 4px;
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
@@ -1691,44 +1694,67 @@ body {
   }
 
   .trans-single-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px;
+    width: 100% !important;
     min-width: 0 !important;
     overflow: hidden !important;
     flex: 1 1 auto !important;
   }
 
   .trans-pill-date {
-    font-size: 0.66rem;
-    padding: 1px 4px;
+    font-size: 0.7rem;
+    padding: 1px 5px;
+    border-radius: 4px;
     flex-shrink: 0;
+    font-weight: 600;
   }
 
   .trans-pill-cat {
-    font-size: 0.72rem;
+    font-size: 0.76rem;
+    font-weight: 700;
     flex-shrink: 0;
   }
 
   .trans-pill-note {
-    font-size: 0.68rem;
+    font-size: 0.72rem;
+    color: #64748b;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
     min-width: 0 !important;
+    flex: 1;
   }
 
   .trans-single-right {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 8px;
+    width: 100% !important;
+    margin-top: 1px;
+    padding-top: 3px;
+    border-top: 1px dashed rgba(226, 232, 240, 0.8);
     flex-shrink: 0;
   }
 
   .trans-pill-amount {
-    font-size: 0.78rem;
+    font-size: 0.92rem;
+    font-weight: 800;
+    letter-spacing: -0.2px;
     flex-shrink: 0;
+    white-space: nowrap;
   }
 
   .trans-pill-del {
-    font-size: 0.75rem;
-    padding: 2px 4px;
+    font-size: 0.78rem;
+    padding: 2px 6px;
     touch-action: manipulation;
     flex-shrink: 0;
+    background: #f8fafc;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
   }
 
   .modal-content {
