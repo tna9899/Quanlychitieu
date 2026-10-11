@@ -47,7 +47,7 @@ body {
   margin: 0;
   padding: 16px 12px;
   padding-top: max(12px, env(safe-area-inset-top));
-  padding-bottom: max(32px, env(safe-area-inset-bottom));
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
   padding-left: max(12px, env(safe-area-inset-left));
   padding-right: max(12px, env(safe-area-inset-right));
   overflow-x: hidden;
@@ -62,7 +62,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding-bottom: 24px;
+  padding-bottom: 4px;
 }
 
 /* Header */
@@ -1467,12 +1467,12 @@ body {
   body {
     padding: 8px 6px;
     padding-top: max(10px, env(safe-area-inset-top));
-    padding-bottom: max(32px, env(safe-area-inset-bottom));
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
   }
 
   .app-container {
     gap: 12px;
-    padding-bottom: 24px;
+    padding-bottom: 2px;
   }
 
   .app-header {
@@ -1685,17 +1685,18 @@ body {
   }
 
   .app-footer {
-    padding: 14px 0 16px 0;
-    font-size: 0.76rem;
+    padding: 6px 0 2px 0;
+    font-size: 0.72rem;
   }
 }
 
 /* ================== DÒNG BẢN QUYỀN / TÁC GIẢ Ở CUỐI TRANG ================== */
 .app-footer {
   text-align: center;
-  padding: 20px 0 10px 0;
+  padding: 8px 0 2px 0;
+  margin-top: -6px;
   color: var(--text-muted);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   letter-spacing: 0.3px;
   width: 100%;
 }
@@ -1703,5 +1704,5 @@ body {
 .app-footer em {
   font-style: italic;
   font-weight: 500;
-  opacity: 0.85;
+  opacity: 0.8;
 }
