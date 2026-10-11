@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Quản Lý Chi Tiêu</title>
+  <meta name="theme-color" content="#2563eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Chi Tiêu">
+  <link rel="icon" type="image/png" href="../logo.png">
+  <link rel="apple-touch-icon" href="../logo.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-left">
+        <img src="../logo.png" alt="Logo" class="app-logo" onerror="this.src='../logo_38.png'; this.onerror=null;">
+        <div class="app-title-box">
+          <h1>Quản Lý Chi Tiêu</h1>
+          <p id="headerSubtext">Đồng bộ Google Drive</p>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <div id="connectionStatus" class="status-pill status-disconnected">
+          <span class="status-dot"></span>
+          <span id="statusText">Chưa kết nối</span>
+        </div>
+        <button id="btnSettings" class="btn-icon" title="Cấu hình kết nối">⚙️</button>
+      </div>
+    </header>
+
+    <!-- Summary Card -->
+    <section class="summary-card">
+      <div class="summary-header">
+        <span id="currentMonthText">Tháng 10-2026</span>
+        <span id="refreshSummary" style="cursor: pointer; opacity: 0.9;" title="Làm mới tổng">🔄</span>
+      </div>
+      <div class="summary-amount" id="totalMonthAmount">0 ₫</div>
+      <div class="summary-footer">
+        <span>Tổng chi tiêu trong tháng</span>
+        <span id="entryCountText">0 khoản chi</span>
+      </div>
+    </section>
+
+    <!-- Form Input Card -->
+    <main class="card">
+      <div class="card-title">
+        <span>✏️</span>
+        <span>Thêm khoản chi tiêu mới</span>
+      </div>
+
+      <form id="expenseForm">
+        <!-- Ngày -->
+        <div class="form-group">
+          <label class="form-label" for="expenseDate">Ngày chi tiêu</label>
+          <input type="date" id="expenseDate" class="input-control" required>
+        </div>
+
+        <!-- Số tiền -->
+        <div class="form-group">
+          <label class="form-label" for="expenseAmount">Số tiền (VNĐ)</label>
+          <div class="amount-input-wrapper">
+            <input type="text" id="expenseAmount" class="input-control amount-input" placeholder="0" inputmode="numeric" required autocomplete="off">
+            <span class="currency-badge">₫</span>
+          </div>
+          <!-- Quick Amount Chips -->
+          <div class="quick-chips">
+            <button type="button" class="chip-btn" data-add="10000">+10k</button>
+            <button type="button" class="chip-btn" data-add="20000">+20k</button>
+            <button type="button" class="chip-btn" data-add="50000">+50k</button>
+            <button type="button" class="chip-btn" data-add="100000">+100k</button>
+            <button type="button" class="chip-btn" data-add="200000">+200k</button>
+            <button type="button" class="chip-btn" data-add="500000">+500k</button>
+            <button type="button" class="chip-btn" id="btnClearAmount" style="color: #ef4444;">Xóa</button>
+          </div>
+        </div>
+
+        <!-- Danh mục -->
+        <div class="form-group">
+          <label class="form-label">Danh mục chi tiêu</label>
+          <div class="category-grid" id="categoryGrid">
+            <div class="category-option selected" data-category="Ăn uống">
+              <span class="cat-icon">🍜</span>
+              <span class="cat-name">Ăn uống</span>
+            </div>
+            <div class="category-option" data-category="Di chuyển">
+              <span class="cat-icon">🛵</span>
+              <span class="cat-name">Di chuyển</span>
+            </div>
+            <div class="category-option" data-category="Mua sắm">
+              <span class="cat-icon">🛍️</span>
+              <span class="cat-name">Mua sắm</span>
+            </div>
+            <div class="category-option" data-category="Giải trí">
+              <span class="cat-icon">🎬</span>
+              <span class="cat-name">Giải trí</span>
+            </div>
+            <div class="category-option" data-category="Điện nước">
+              <span class="cat-icon">💡</span>
+              <span class="cat-name">Điện nước</span>
+            </div>
+            <div class="category-option" data-category="Cá nhân">
+              <span class="cat-icon">👤</span>
+              <span class="cat-name">Cá nhân</span>
+            </div>
+            <div class="category-option" data-category="Tiền trọ">
+              <span class="cat-icon">🏠</span>
+              <span class="cat-name">Tiền trọ</span>
+            </div>
+            <div class="category-option" data-category="Hiếu/ Hỉ">
+              <span class="cat-icon">💌</span>
+              <span class="cat-name">Hiếu/ Hỉ</span>
+            </div>
+          </div>
+          <input type="hidden" id="selectedCategory" value="Ăn uống">
+        </div>
+
+        <!-- Ghi chú -->
+        <div class="form-group">
+          <label class="form-label" for="expenseNote">Ghi chú (Tùy chọn)</label>
+          <input type="text" id="expenseNote" class="input-control" placeholder="Ví dụ: Ăn trưa, đổ xăng, cafe..." autocomplete="off">
+        </div>
+
+        <!-- Nút Gửi -->
+        <button type="submit" id="btnSubmit" class="btn-submit">
+          <span id="btnSubmitText">💾 Lưu chi tiêu</span>
+          <div id="btnSpinner" class="spinner" style="display: none;"></div>
+        </button>
+      </form>
+    </main>
+
+    <!-- Recent Transactions Card -->
+    <section class="card">
+      <div class="card-title" style="justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>🕒</span>
+          <span>Khoản chi vừa thêm</span>
+        </div>
+        <button id="btnClearHistory" style="background: none; border: none; font-size: 0.75rem; color: #64748b; cursor: pointer;">Xóa lịch sử</button>
+      </div>
+
+      <div class="recent-list" id="recentList">
+        <div class="empty-state">Chưa có khoản chi nào được thêm gần đây.</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Modal Settings -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>⚙️ Cài đặt kết nối</h3>
+        <button id="btnCloseSettings" class="btn-icon">✕</button>
+      </div>
+      <div class="modal-body">
+        <p>Để lưu dữ liệu trực tiếp vào file Google Sheets của bạn, hãy nhập URL của <strong>Google Apps Script Web App</strong>.</p>
+        <div class="form-group">
+          <label class="form-label" for="apiUrlInput">Web App URL</label>
+          <input type="url" id="apiUrlInput" class="input-control" placeholder="https://script.google.com/macros/s/.../exec">
+        </div>
+        <p style="font-size: 0.75rem; color: #64748b;">
+          💡 Xem file <code>web/Code.gs</code> trong thư mục dự án để lấy mã nguồn và triển khai miễn phí trên Google Drive trong 1 phút.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button id="btnTestConnection" class="btn-secondary">Thử kết nối</button>
+        <button id="btnSaveSettings" class="btn-primary">Lưu cài đặt</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast toast-success">
+    <span id="toastIcon">✓</span>
+    <span id="toastMessage">Đã lưu chi tiêu thành công!</span>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
