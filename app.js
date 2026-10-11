@@ -546,41 +546,13 @@ expenseAmount.addEventListener("input", (e) => {
   );
 });
 
-// ================= 5. THANH THÔNG BÁO ĐỒNG BỘ (BỘ ĐẾM 3S TỰ TẮT) =================
+// ================= 5. THANH THÔNG BÁO ĐỒNG BỘ (ĐÃ ẨN THEO YÊU CẦU) =================
 
 function showSyncNotificationBanner(count, income, expense, savings) {
-  if (!syncNotificationBanner || !syncBannerText) return;
-
-  const timeStr = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
-  const savingsSign = savings >= 0 ? "+" : "-";
-  const savingsFormatted = savingsSign + " " + formatCurrencyNumber(Math.abs(savings)) + " ₫";
-
-  syncBannerText.innerText = `Đã đồng bộ Google Sheets lúc ${timeStr} (${count} giao dịch | Tiết kiệm: ${savingsFormatted})`;
-
-  if (syncCountdownInterval) {
-    clearInterval(syncCountdownInterval);
-    syncCountdownInterval = null;
+  if (syncNotificationBanner) {
+    syncNotificationBanner.style.display = "none";
   }
-
-  syncCountdownSeconds = 3;
-  if (syncCountdownBadge) {
-    syncCountdownBadge.innerText = `${syncCountdownSeconds}s`;
-  }
-
-  syncNotificationBanner.style.display = "flex";
-
-  syncCountdownInterval = setInterval(() => {
-    syncCountdownSeconds--;
-    if (syncCountdownSeconds > 0) {
-      if (syncCountdownBadge) {
-        syncCountdownBadge.innerText = `${syncCountdownSeconds}s`;
-      }
-    } else {
-      clearInterval(syncCountdownInterval);
-      syncCountdownInterval = null;
-      syncNotificationBanner.style.display = "none";
-    }
-  }, 1000);
+  return;
 }
 
 if (btnCloseSyncBanner) {
@@ -930,7 +902,7 @@ function renderTransactionsList() {
         <div class="trans-single-left">
           <span class="trans-pill-date">${escapeHtml(dateDisplay)}</span>
           ${isAllFilter ? `<span class="trans-pill-cat">${icon} ${escapeHtml(item.category)}</span>` : ""}
-          ${item.note ? `<span class="trans-pill-note" title="${escapeHtml(item.note)}">📝 ${escapeHtml(item.note)}</span>` : ""}
+          ${item.note ? `<span class="trans-pill-note" title="${escapeHtml(item.note)}">${escapeHtml(item.note)}</span>` : ""}
         </div>
         <div class="trans-single-right">
           <span class="${amountClass}">${amountSign} ${formatCurrencyNumber(item.amount)} ₫</span>
@@ -1035,7 +1007,7 @@ function renderSalarySavingsBreakdown(income, expense, savings, cumulative, star
   salarySavingsBreakdownContainer.innerHTML = `
     <div class="salary-savings-card">
       <div class="ss-header">
-        <span class="ss-title">💰 Tiền lương (Thu nhập)</span>
+        <span class="ss-title">💰 Thu nhập</span>
         <span class="ss-amount text-income">+ ${formatCurrencyNumber(income)} ₫</span>
       </div>
       <div class="breakdown-bar-bg">
@@ -1046,7 +1018,7 @@ function renderSalarySavingsBreakdown(income, expense, savings, cumulative, star
 
     <div class="salary-savings-card">
       <div class="ss-header">
-        <span class="ss-title">🏦 Tiền tiết kiệm (= Lương - Chi)</span>
+        <span class="ss-title">🏦 Tiền tiết kiệm</span>
         <span class="ss-amount ${savingsClass}">${savingsSign} ${formatCurrencyNumber(Math.abs(savings))} ₫</span>
       </div>
       <div class="breakdown-bar-bg">
@@ -1462,23 +1434,79 @@ function escapeHtml(str) {
 // Khởi chạy khi tài liệu sẵn sàng
 initApp();
 
-// ================= 11. TỰ ĐỘNG ĐỒNG BỘ KHI MỞ LẠI TAB HOẶC FOCUS =================
+// ================= 11. TỰ ĐỘNG ĐỒNG BỘ LÚC 0 GIỜ NGÀY MỚI & KHI THIẾT BỊ MỞ LẠI =================
+
+let lastTrackedDay = new Date().getDate();
+
+function checkDayChangeAndSync() {
+  const now = new Date();
+  if (now.getDate() !== lastTrackedDay) {
+    lastTrackedDay = now.getDate();
+    // Đã bước sang ngày mới
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    if (expenseDate) {
+      expenseDate.value = `${yyyy}-${mm}-${dd}`;
+    }
+    // Nếu tháng mới, chuyển tháng hiển thị sang tháng mới
+    if (now.getMonth() + 1 !== currentMonth || now.getFullYear() !== currentYear) {
+      currentMonth = now.getMonth() + 1;
+      currentYear = now.getFullYear();
+      updateMonthDisplay();
+      if (currentEntryType === "expense") {
+        renderCategoryGrid(currentMonth, currentYear);
+      }
+      renderFilterPills(currentMonth, currentYear);
+      loadMonthCache();
+    }
+    syncMonthDataFromServer(true);
+  } else {
+    syncMonthDataFromServer(true);
+  }
+}
+
+// Lập lịch chính xác vào lúc 00:00:05 mỗi ngày mới
+function scheduleMidnightSync() {
+  const now = new Date();
+  const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+  const msToMidnight = nextMidnight.getTime() - now.getTime();
+
+  setTimeout(() => {
+    lastTrackedDay = new Date().getDate();
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    if (expenseDate) {
+      expenseDate.value = `${yyyy}-${mm}-${dd}`;
+    }
+    if (today.getMonth() + 1 !== currentMonth || today.getFullYear() !== currentYear) {
+      currentMonth = today.getMonth() + 1;
+      currentYear = today.getFullYear();
+      updateMonthDisplay();
+      if (currentEntryType === "expense") {
+        renderCategoryGrid(currentMonth, currentYear);
+      }
+      renderFilterPills(currentMonth, currentYear);
+      loadMonthCache();
+    }
+    syncMonthDataFromServer(true);
+    scheduleMidnightSync(); // Tiếp tục lập lịch cho đêm tiếp theo
+  }, msToMidnight);
+}
+
+scheduleMidnightSync();
 
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
-    syncMonthDataFromServer(true);
+    checkDayChangeAndSync();
   }
 });
 
 window.addEventListener("focus", () => {
-  syncMonthDataFromServer(true);
+  checkDayChangeAndSync();
 });
-
-setInterval(() => {
-  if (document.visibilityState === "visible") {
-    syncMonthDataFromServer(true);
-  }
-}, 60000);
 
 // ================= 12. THANH ĐIỀU HƯỚNG TAB TRÊN ĐIỆN THOẠI =================
 const mobileNavBar = document.getElementById("mobileNavBar");

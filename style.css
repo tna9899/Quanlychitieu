@@ -57,11 +57,14 @@ body {
 
 .app-container {
   width: 100%;
-  max-width: 1180px;
+  max-width: 1200px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  padding-left: 16px;
+  padding-right: 16px;
+  box-sizing: border-box;
   padding-bottom: 4px;
 }
 
@@ -175,9 +178,11 @@ body {
 /* ================== BỐ CỤC 2 CỘT (DASHBOARD GRID) ================== */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 420px 1fr;
-  gap: 18px;
+  grid-template-columns: 380px 1fr;
+  gap: 16px;
   align-items: start;
+  width: 100%;
+  min-width: 0;
 }
 
 @media (max-width: 900px) {
@@ -190,12 +195,16 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  width: 100%;
+  min-width: 0;
 }
 
 .col-right {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  width: 100%;
+  min-width: 0;
 }
 
 /* Summary Card */
@@ -324,6 +333,10 @@ body {
   padding: 18px;
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border-color);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .card-title {
@@ -334,6 +347,8 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* Form Styles */
@@ -500,6 +515,9 @@ body {
   flex-direction: column;
   gap: 8px;
   margin-bottom: 12px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .search-box {
@@ -511,6 +529,7 @@ body {
   border-radius: var(--radius-sm);
   background: #f8fafc;
   outline: none;
+  box-sizing: border-box;
 }
 
 .search-box:focus {
@@ -524,6 +543,10 @@ body {
   overflow-x: auto;
   padding-bottom: 4px;
   scrollbar-width: none;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
 }
 
 .category-filter-pills::-webkit-scrollbar {
@@ -540,6 +563,7 @@ body {
   font-weight: 600;
   color: #64748b;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .filter-pill.active {
@@ -556,6 +580,10 @@ body {
   max-height: 480px;
   overflow-y: auto;
   padding-right: 2px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* ================== GIAO DỊCH HIỂN THỊ TẤT CẢ TRONG 1 DÒNG ================== */
@@ -572,6 +600,9 @@ body {
   gap: 8px;
   min-height: 38px;
   box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .transaction-row-single:hover {
@@ -891,81 +922,10 @@ body {
   background: #dc2626;
 }
 
-/* ================== THANH THÔNG BÁO ĐÃ ĐỒNG BỘ (CÓ BỘ ĐẾM 3S TỰ TẮT) ================== */
-.sync-banner {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 14px;
-  background: #ecfdf5;
-  border: 1.5px solid #a7f3d0;
-  border-radius: var(--radius-md);
-  color: #065f46;
-  font-size: 0.82rem;
-  font-weight: 600;
-  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.08);
-  animation: slideDown 0.3s ease-out forwards;
-  gap: 10px;
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.sync-banner-content {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
-
-.sync-banner-icon {
-  font-size: 1.1rem;
-  flex-shrink: 0;
-}
-
-.sync-banner-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.sync-countdown-badge {
-  background: #d1fae5;
-  color: #047857;
-  border: 1px solid #6ee7b7;
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-  min-width: 28px;
-  text-align: center;
-  display: inline-block;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-.sync-banner-close {
-  background: none;
-  border: none;
-  color: #047857;
-  font-size: 1rem;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
-  transition: var(--transition);
-}
-
-.sync-banner-close:hover {
-  background: #d1fae5;
+/* ================== THANH THÔNG BÁO ĐÃ ĐỒNG BỘ (ĐÃ ẨN THEO YÊU CẦU) ================== */
+.sync-banner,
+#syncNotificationBanner {
+  display: none !important;
 }
 
 /* ================== LƯỚI 3 CHỈ SỐ TÀI CHÍNH THÁNG ================== */
@@ -1645,38 +1605,80 @@ body {
   }
 
   /* Danh sách giao dịch trên điện thoại: KHÔNG KHÓA CHIỀU CAO ĐỂ CUỘN TỰ DO CẢ TRANG */
+  #transactionsListCard,
+  #categoryBreakdownCard,
+  #salarySavingsBreakdownCard {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  #listTitleMonth {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    font-size: 0.85rem;
+  }
+
   .transactions-list {
     max-height: none !important;
     overflow-y: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
   }
 
   .transaction-row-single {
     padding: 7px 8px;
     min-height: 36px;
     gap: 6px;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .trans-single-left {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    flex: 1 1 auto !important;
   }
 
   .trans-pill-date {
     font-size: 0.66rem;
     padding: 1px 4px;
+    flex-shrink: 0;
   }
 
   .trans-pill-cat {
     font-size: 0.72rem;
+    flex-shrink: 0;
   }
 
   .trans-pill-note {
     font-size: 0.68rem;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    min-width: 0 !important;
+  }
+
+  .trans-single-right {
+    flex-shrink: 0;
   }
 
   .trans-pill-amount {
     font-size: 0.78rem;
+    flex-shrink: 0;
   }
 
   .trans-pill-del {
     font-size: 0.75rem;
     padding: 2px 4px;
     touch-action: manipulation;
+    flex-shrink: 0;
   }
 
   .modal-content {
