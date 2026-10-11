@@ -20,6 +20,9 @@ const STORAGE_KEYS = {
   LAST_MONTH: "qly_expense_selected_month"
 };
 
+const START_SAVINGS_MONTH = 6; // Bắt đầu tính lũy kế tích lũy từ Tháng 06
+let corsSupported = null;
+
 // State toàn cục của ứng dụng
 let currentYear = new Date().getFullYear();
 let currentMonth = new Date().getMonth() + 1; // 1 - 12
@@ -180,9 +183,14 @@ function fetchGasJsonp(url, params = {}) {
 
 /**
  * Gọi API Google Apps Script thông minh:
- * Thử fetch() trước, nếu gặp CORS Failed to fetch thì tự động fallback sang JSONP!
+ * Thử fetch() nếu cùng origin hoặc đã biết có CORS.
+ * Với script.google.com (Web App), browser luôn bị chặn CORS do redirect, nên gọi thẳng JSONP để loại bỏ 1-2s trễ vô ích!
  */
 async function callGasApi(url, params = {}) {
+  if (corsSupported === false || (url && url.includes("script.google.com"))) {
+    return await fetchGasJsonp(url, params);
+  }
+
   try {
     const query = new URLSearchParams(params);
     const separator = url.includes("?") ? "&" : "?";
@@ -190,10 +198,12 @@ async function callGasApi(url, params = {}) {
 
     const res = await fetch(fetchUrl);
     if (res.ok) {
+      corsSupported = true;
       const json = await res.json();
       return json;
     }
   } catch (err) {
+    corsSupported = false;
     console.warn("Fetch không khả dụng hoặc bị chặn CORS, tự động chuyển sang JSONP...", err.message);
   }
 
@@ -703,27 +713,28 @@ function loadMonthCache() {
 }
 
 /**
- * Tính toán tiền tiết kiệm cộng dồn từ các tháng trong cache local (bắt đầu từ tháng đầu tiên có giao dịch)
+ * Tính toán tiền tiết kiệm cộng dồn từ các tháng trong cache local (bắt đầu từ Tháng 06)
  */
 function computeCumulativeSavingsLocally() {
-  let cumulative = 0;
-  let firstMonth = null;
+  if (currentMonth < START_SAVINGS_MONTH) {
+    return {
+      cumulativeSavings: 0,
+      savingsStartMonth: START_SAVINGS_MONTH
+    };
+  }
 
-  for (let m = 1; m <= currentMonth; m++) {
+  let cumulative = 0;
+
+  for (let m = START_SAVINGS_MONTH; m <= currentMonth; m++) {
     const raw = localStorage.getItem(getCacheKey(currentYear, m));
     let mSavings = 0;
-    let hasData = false;
 
     if (raw) {
       try {
         const d = JSON.parse(raw);
         const inc = d.totalIncome || 0;
         const exp = d.total || 0;
-        const count = (d.transactions && d.transactions.length) || 0;
-        if (count > 0 || inc > 0 || exp > 0) {
-          hasData = true;
-          mSavings = d.monthSavings !== undefined ? d.monthSavings : (inc - exp);
-        }
+        mSavings = d.monthSavings !== undefined ? d.monthSavings : (inc - exp);
       } catch (e) {}
     } else if (m === currentMonth && monthTransactions.length > 0) {
       let inc = 0;
@@ -733,21 +744,15 @@ function computeCumulativeSavingsLocally() {
         if (isInc) inc += (t.amount || 0);
         else exp += (t.amount || 0);
       });
-      if (monthTransactions.length > 0 || inc > 0 || exp > 0) {
-        hasData = true;
-        mSavings = inc - exp;
-      }
+      mSavings = inc - exp;
     }
 
-    if (hasData) {
-      if (firstMonth === null) firstMonth = m;
-      cumulative += mSavings;
-    }
+    cumulative += mSavings;
   }
 
   return {
     cumulativeSavings: cumulative,
-    savingsStartMonth: firstMonth
+    savingsStartMonth: START_SAVINGS_MONTH
   };
 }
 
@@ -773,31 +778,19 @@ function renderFinancialViews(data = {}) {
 
   const monthSavings = incomeSum - expenseSum;
 
-  // Tính tiền tiết kiệm cộng dồn bắt đầu từ tháng có giao dịch
+  // Tính tiền tiết kiệm cộng dồn bắt đầu từ Tháng 06
   let cumulativeSavings = 0;
-  let savingsStartMonth = null;
+  let savingsStartMonth = START_SAVINGS_MONTH;
 
-  if (data.cumulativeSavings !== undefined) {
+  if (currentMonth < START_SAVINGS_MONTH) {
+    cumulativeSavings = 0;
+  } else if (data.cumulativeSavings !== undefined) {
     cumulativeSavings = data.cumulativeSavings;
-    savingsStartMonth = data.savingsStartMonth !== undefined ? data.savingsStartMonth : null;
+    savingsStartMonth = START_SAVINGS_MONTH;
   } else {
     const localCum = computeCumulativeSavingsLocally();
     cumulativeSavings = localCum.cumulativeSavings;
     savingsStartMonth = localCum.savingsStartMonth;
-  }
-
-  // Nếu chưa xác định được savingsStartMonth nhưng tháng hiện tại hoặc cache có giao dịch
-  if (savingsStartMonth === null && (monthTransactions.length > 0 || incomeSum > 0 || expenseSum > 0)) {
-    savingsStartMonth = currentMonth;
-  }
-  if (savingsStartMonth === null) {
-    const localCum = computeCumulativeSavingsLocally();
-    if (localCum.savingsStartMonth !== null) {
-      savingsStartMonth = localCum.savingsStartMonth;
-      if (data.cumulativeSavings === undefined) {
-        cumulativeSavings = localCum.cumulativeSavings;
-      }
-    }
   }
 
   // 2. Hiển thị Lưới 3 chỉ số tài chính
@@ -813,11 +806,11 @@ function renderFinancialViews(data = {}) {
     monthSavingsAmount.className = "stat-value is-negative";
   }
 
-  // 3. Hiển thị Tiền tiết kiệm cộng dồn tích lũy (tính từ tháng có giao dịch)
+  // 3. Hiển thị Tiền tiết kiệm cộng dồn tích lũy (bắt đầu từ Tháng 06)
   const cumSign = cumulativeSavings >= 0 ? "+" : "-";
   const cumClass = cumulativeSavings >= 0 ? "cum-amount" : "cum-amount is-negative";
 
-  if (savingsStartMonth === null) {
+  if (currentMonth < START_SAVINGS_MONTH) {
     cumulativeSavingsAmount.innerText = "0 ₫";
     cumulativeSavingsAmount.className = "cum-amount";
   } else {
@@ -828,12 +821,12 @@ function renderFinancialViews(data = {}) {
   // Cập nhật nhãn phụ của khối cộng dồn
   const cumSubtitleEl = document.getElementById("cumSubtitleText");
   if (cumSubtitleEl) {
-    if (savingsStartMonth === null) {
-      cumSubtitleEl.innerText = "Tích lũy từ tháng có giao dịch";
-    } else if (currentMonth === savingsStartMonth) {
-      cumSubtitleEl.innerText = `Tích lũy Tháng ${String(savingsStartMonth).padStart(2, "0")}`;
+    if (currentMonth < START_SAVINGS_MONTH) {
+      cumSubtitleEl.innerText = `Bắt đầu tính lũy kế từ Tháng ${String(START_SAVINGS_MONTH).padStart(2, "0")}`;
+    } else if (currentMonth === START_SAVINGS_MONTH) {
+      cumSubtitleEl.innerText = `Tích lũy Tháng ${String(START_SAVINGS_MONTH).padStart(2, "0")}`;
     } else {
-      cumSubtitleEl.innerText = `Tích lũy từ Tháng ${String(savingsStartMonth).padStart(2, "0")} đến hết Tháng ${String(currentMonth).padStart(2, "0")}`;
+      cumSubtitleEl.innerText = `Tích lũy từ Tháng ${String(START_SAVINGS_MONTH).padStart(2, "0")} đến hết Tháng ${String(currentMonth).padStart(2, "0")}`;
     }
   }
 
@@ -1031,19 +1024,19 @@ function renderSalarySavingsBreakdown(income, expense, savings, cumulative, star
     <div class="salary-savings-card">
       <div class="ss-header">
         <span class="ss-title">⭐ Tiết kiệm cộng dồn</span>
-        <span class="ss-amount ${startMonth === null ? 'text-savings' : cumClass}">
-          ${startMonth === null ? '0 ₫' : (cumSign + ' ' + formatCurrencyNumber(Math.abs(cumulative)) + ' ₫')}
+        <span class="ss-amount ${currentMonth < START_SAVINGS_MONTH ? 'text-savings' : cumClass}">
+          ${currentMonth < START_SAVINGS_MONTH ? '0 ₫' : (cumSign + ' ' + formatCurrencyNumber(Math.abs(cumulative)) + ' ₫')}
         </span>
       </div>
       <div class="breakdown-bar-bg">
-        <div class="breakdown-bar-fill" style="width: ${startMonth === null ? '0%' : '100%'}; background: #2563eb;"></div>
+        <div class="breakdown-bar-fill" style="width: ${currentMonth < START_SAVINGS_MONTH ? '0%' : '100%'}; background: #2563eb;"></div>
       </div>
       <div class="ss-desc">
-        ${startMonth === null 
-          ? 'Chưa có giao dịch tích lũy nào.' 
-          : (currentMonth === startMonth 
-              ? `Số tiền tiết kiệm tích lũy trong Tháng ${String(startMonth).padStart(2, '0')}.` 
-              : `Tổng số tiền tiết kiệm tích lũy từ Tháng ${String(startMonth).padStart(2, '0')} đến hết Tháng ${String(currentMonth).padStart(2, '0')}.`)}
+        ${currentMonth < START_SAVINGS_MONTH 
+          ? `Bắt đầu tính lũy kế tích lũy từ Tháng ${String(START_SAVINGS_MONTH).padStart(2, '0')}.` 
+          : (currentMonth === START_SAVINGS_MONTH 
+              ? `Số tiền tiết kiệm tích lũy trong Tháng ${String(START_SAVINGS_MONTH).padStart(2, '0')}.` 
+              : `Tổng số tiền tiết kiệm tích lũy từ Tháng ${String(START_SAVINGS_MONTH).padStart(2, '0')} đến hết Tháng ${String(currentMonth).padStart(2, '0')}.`)}
       </div>
     </div>
   `;
@@ -1067,7 +1060,10 @@ window.handleDeleteTransaction = async function(row) {
     return;
   }
 
-  showToast("Đang xóa trên Google Sheets...", "success");
+  // Tối ưu UI: xóa ngay khỏi danh sách cục bộ
+  monthTransactions = monthTransactions.filter(t => t.row !== row);
+  renderFinancialViews();
+  showToast("Đã xóa giao dịch! Đang đồng bộ Drive...", "success");
 
   try {
     const result = await callGasApi(apiUrl, {
@@ -1078,13 +1074,14 @@ window.handleDeleteTransaction = async function(row) {
     });
 
     if (result && result.success) {
-      showToast("Đã xóa giao dịch thành công!", "success");
-      syncMonthDataFromServer();
+      showToast("Đã xóa vĩnh viễn trên Google Sheets!", "success");
+      syncMonthDataFromServer(true);
     } else {
       throw new Error((result && result.error) || "Không thể xóa dòng");
     }
   } catch (e) {
     showToast("Lỗi khi xóa: " + e.message, "error");
+    syncMonthDataFromServer(true);
   }
 };
 
@@ -1104,6 +1101,58 @@ expenseForm.addEventListener("submit", async (e) => {
     return;
   }
 
+  const apiUrl = (localStorage.getItem(STORAGE_KEYS.API_URL) || "").trim();
+  if (!apiUrl) {
+    showToast("Chưa có URL Google Apps Script để đồng bộ!", "error");
+    openSettings();
+    return;
+  }
+
+  const dateParts = dateVal.split("-");
+  const inputYear = parseInt(dateParts[0]);
+  const inputMonth = parseInt(dateParts[1]);
+  const isCurrentViewingMonth = (inputYear === currentYear && inputMonth === currentMonth);
+
+  // 1. TỐI ƯU HÓA PHẢN HỒI TỨC THÌ (OPTIMISTIC UI UPDATE - 0ms):
+  // Cập nhật ngay lập tức giao diện người dùng mà không phải chờ mạng!
+  const newTx = {
+    row: null,
+    date: dateVal,
+    category: categoryVal,
+    amount: amountVal,
+    note: noteVal,
+    type: currentEntryType === "income" ? "income" : "expense"
+  };
+
+  if (isCurrentViewingMonth) {
+    monthTransactions.unshift(newTx);
+
+    // Cập nhật thống kê danh mục chi tiêu tức thì
+    if (currentEntryType === "expense") {
+      let catItem = categoryTotals.find(c => c.name === categoryVal);
+      if (catItem) {
+        catItem.total = (catItem.total || 0) + amountVal;
+      } else {
+        categoryTotals.push({ name: categoryVal, total: amountVal });
+      }
+    }
+
+    renderFinancialViews();
+    saveMonthCache({
+      transactions: monthTransactions,
+      categories: categoryTotals
+    });
+  }
+
+  // Xóa form và chuyển sang trạng thái sẵn sàng ngay lập tức!
+  const typeDesc = currentEntryType === "income" ? "tiền lương (+)" : "khoản chi (-)";
+  showToast(`Đã ghi nhận ${typeDesc}! Đang lưu lên Drive...`, "success");
+
+  expenseAmount.value = "";
+  expenseNote.value = "";
+  expenseAmount.focus();
+
+  // 2. GỬI LÊN DRIVE TRONG NỀN (BACKGROUND ASYNC - KHÔNG CHẶN GIAO DIỆN)
   const payload = {
     action: "add",
     date: dateVal,
@@ -1113,60 +1162,40 @@ expenseForm.addEventListener("submit", async (e) => {
     type: currentEntryType
   };
 
-  const apiUrl = (localStorage.getItem(STORAGE_KEYS.API_URL) || "").trim();
-  if (!apiUrl) {
-    showToast("Chưa có URL Google Apps Script để đồng bộ!", "error");
-    openSettings();
-    return;
-  }
-
-  setLoadingState(true);
-
-  try {
-    // 1. Thử gửi qua fetch POST (nếu không chặn)
-    let sendOk = false;
+  (async () => {
     try {
-      await fetch(apiUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload)
-      });
-      sendOk = true;
-    } catch (postErr) {
-      console.warn("POST no-cors gặp trở ngại, chuyển sang GET add qua JSONP...", postErr);
+      let sendOk = false;
+      try {
+        await fetch(apiUrl, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(payload)
+        });
+        sendOk = true;
+      } catch (postErr) {
+        console.warn("POST no-cors gặp trở ngại, chuyển sang GET add qua JSONP...", postErr);
+      }
+
+      if (!sendOk) {
+        await callGasApi(apiUrl, {
+          action: "add",
+          date: dateVal,
+          category: categoryVal,
+          amount: amountVal,
+          note: noteVal
+        });
+      }
+
+      // Khi server hoàn tất lưu, đồng bộ nhẹ trong nền để khớp số thứ tự dòng row
+      if (isCurrentViewingMonth) {
+        await syncMonthDataFromServer(true);
+      }
+    } catch (err) {
+      console.error("Lỗi gửi dữ liệu lên Drive:", err);
+      showToast("⚠️ Lưu ngầm lên Google Sheets gặp lỗi: " + err.message, "error");
     }
-
-    // 2. Dự phòng qua GET/JSONP nếu cần
-    if (!sendOk) {
-      await callGasApi(apiUrl, {
-        action: "add",
-        date: dateVal,
-        category: categoryVal,
-        amount: amountVal,
-        note: noteVal
-      });
-    }
-
-    const typeDesc = currentEntryType === "income" ? "tiền lương (+)" : "khoản chi (-)";
-    showToast(`Đã lưu ${typeDesc} thành công vào Google Sheets!`, "success");
-
-    expenseAmount.value = "";
-    expenseNote.value = "";
-    expenseAmount.focus();
-
-    // Tự động tải lại tháng sau khi thêm
-    const inputYear = parseInt(dateVal.split("-")[0]);
-    const inputMonth = parseInt(dateVal.split("-")[1]);
-    if (inputYear === currentYear && inputMonth === currentMonth) {
-      setTimeout(() => syncMonthDataFromServer(), 1200);
-    }
-  } catch (err) {
-    console.error("Lỗi gửi dữ liệu:", err);
-    showToast("Lỗi gửi dữ liệu: " + err.message, "error");
-  } finally {
-    setLoadingState(false);
-  }
+  })();
 });
 
 function setLoadingState(isLoading) {
