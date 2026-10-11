@@ -270,16 +270,13 @@ function addNewTransactionRecord(dateStr, category, amount, note) {
 }
 
 /**
- * Tính toán tiền tiết kiệm cộng dồn (Bắt đầu tính từ tháng 11)
+ * Tính toán tiền tiết kiệm cộng dồn từ tháng đầu tiên có giao dịch đến tháng hiện tại
  */
 function calculateCumulativeSavings(ss, year, currentMonthNum) {
-  const START_SAVINGS_MONTH = 11;
-  if (currentMonthNum < START_SAVINGS_MONTH) {
-    return 0;
-  }
-
   let cumulative = 0;
-  for (let m = START_SAVINGS_MONTH; m <= currentMonthNum; m++) {
+  let firstMonthFound = null;
+
+  for (let m = 1; m <= currentMonthNum; m++) {
     const sName = "Tháng " + String(m).padStart(2, "0") + "-" + year;
     const s = ss.getSheetByName(sName);
     if (!s) continue;
@@ -290,19 +287,32 @@ function calculateCumulativeSavings(ss, year, currentMonthNum) {
     const vals = s.getRange(2, 2, lRow - 1, 2).getValues();
     let mIncome = 0;
     let mExpense = 0;
+    let hasTrans = false;
+
     for (let r = 0; r < vals.length; r++) {
       const cat = String(vals[r][0] || "").trim();
       const amt = Number(vals[r][1]) || 0;
       if (amt <= 0) continue;
+      hasTrans = true;
       if (cat === "Tiền lương" || cat === "Lương" || cat === "Thu nhập") {
         mIncome += amt;
       } else {
         mExpense += amt;
       }
     }
-    cumulative += (mIncome - mExpense);
+
+    if (hasTrans) {
+      if (firstMonthFound === null) {
+        firstMonthFound = m;
+      }
+      cumulative += (mIncome - mExpense);
+    }
   }
-  return cumulative;
+
+  return {
+    cumulativeSavings: cumulative,
+    savingsStartMonth: firstMonthFound
+  };
 }
 
 /**
@@ -333,7 +343,7 @@ function getMonthData(year, month) {
 
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
-    const cumulative = calculateCumulativeSavings(ss, year, numMonth);
+    const cumData = calculateCumulativeSavings(ss, year, numMonth);
     return {
       success: true,
       year: year,
@@ -344,7 +354,8 @@ function getMonthData(year, month) {
       total: 0,
       totalIncome: 0,
       monthSavings: 0,
-      cumulativeSavings: cumulative,
+      cumulativeSavings: cumData.cumulativeSavings,
+      savingsStartMonth: cumData.savingsStartMonth,
       count: 0,
       categories: monthCategories.map(c => ({ name: c, total: 0 })),
       transactions: [],
@@ -417,8 +428,8 @@ function getMonthData(year, month) {
   // Tính số tiền dư trong tháng (tiết kiệm tháng) = Lương (+) - Chi tiêu (-)
   const monthSavings = totalIncome - totalExpense;
 
-  // Tính số tiền tiết kiệm cộng dồn từ tháng 1 đến tháng hiện tại
-  const cumulativeSavings = calculateCumulativeSavings(ss, year, numMonth);
+  // Tính số tiền tiết kiệm cộng dồn từ tháng đầu tiên có giao dịch đến tháng hiện tại
+  const cumData = calculateCumulativeSavings(ss, year, numMonth);
 
   return {
     success: true,
@@ -427,10 +438,11 @@ function getMonthData(year, month) {
     sheetName: sheetName,
     spreadsheetUrl: ss.getUrl(),
     spreadsheetId: ss.getId(),
-    total: totalExpense,                   // Tổng chi tiêu (-)
-    totalIncome: totalIncome,             // Tiền lương / Thu nhập (+)
-    monthSavings: monthSavings,           // Số tiền dư trong tháng (tiết kiệm tháng)
-    cumulativeSavings: cumulativeSavings, // Tiền tiết kiệm cộng dồn hàng tháng
+    total: totalExpense,                         // Tổng chi tiêu (-)
+    totalIncome: totalIncome,                   // Tiền lương / Thu nhập (+)
+    monthSavings: monthSavings,                 // Số tiền dư trong tháng (tiết kiệm tháng)
+    cumulativeSavings: cumData.cumulativeSavings, // Tiền tiết kiệm cộng dồn
+    savingsStartMonth: cumData.savingsStartMonth, // Tháng bắt đầu có giao dịch
     count: transactions.length,
     categories: catSummary,
     transactions: transactions,

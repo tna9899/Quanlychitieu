@@ -702,33 +702,53 @@ function loadMonthCache() {
   renderFinancialViews({ total: 0, totalIncome: 0, monthSavings: 0, cumulativeSavings: 0 });
 }
 
-const START_SAVINGS_MONTH = 11; // Tiết kiệm cộng dồn bắt đầu tính từ tháng 11
-
 /**
- * Tính toán tiền tiết kiệm cộng dồn từ các tháng trong cache local (bắt đầu tính từ tháng 11)
+ * Tính toán tiền tiết kiệm cộng dồn từ các tháng trong cache local (bắt đầu từ tháng đầu tiên có giao dịch)
  */
 function computeCumulativeSavingsLocally() {
-  if (currentMonth < START_SAVINGS_MONTH) {
-    return 0;
-  }
-
   let cumulative = 0;
-  for (let m = START_SAVINGS_MONTH; m <= currentMonth; m++) {
+  let firstMonth = null;
+
+  for (let m = 1; m <= currentMonth; m++) {
     const raw = localStorage.getItem(getCacheKey(currentYear, m));
+    let mSavings = 0;
+    let hasData = false;
+
     if (raw) {
       try {
         const d = JSON.parse(raw);
-        if (d.monthSavings !== undefined) {
-          cumulative += d.monthSavings;
-        } else {
-          const inc = d.totalIncome || 0;
-          const exp = d.total || 0;
-          cumulative += (inc - exp);
+        const inc = d.totalIncome || 0;
+        const exp = d.total || 0;
+        const count = (d.transactions && d.transactions.length) || 0;
+        if (count > 0 || inc > 0 || exp > 0) {
+          hasData = true;
+          mSavings = d.monthSavings !== undefined ? d.monthSavings : (inc - exp);
         }
       } catch (e) {}
+    } else if (m === currentMonth && monthTransactions.length > 0) {
+      let inc = 0;
+      let exp = 0;
+      monthTransactions.forEach(t => {
+        const isInc = t.type === "income" || t.category === "Tiền lương" || t.category === "Lương" || t.category === "Thu nhập";
+        if (isInc) inc += (t.amount || 0);
+        else exp += (t.amount || 0);
+      });
+      if (monthTransactions.length > 0 || inc > 0 || exp > 0) {
+        hasData = true;
+        mSavings = inc - exp;
+      }
+    }
+
+    if (hasData) {
+      if (firstMonth === null) firstMonth = m;
+      cumulative += mSavings;
     }
   }
-  return cumulative;
+
+  return {
+    cumulativeSavings: cumulative,
+    savingsStartMonth: firstMonth
+  };
 }
 
 // ================= 7. HIỂN THỊ DỮ LIỆU TÀI CHÍNH & DANH SÁCH =================
@@ -753,13 +773,31 @@ function renderFinancialViews(data = {}) {
 
   const monthSavings = incomeSum - expenseSum;
 
+  // Tính tiền tiết kiệm cộng dồn bắt đầu từ tháng có giao dịch
   let cumulativeSavings = 0;
-  if (currentMonth >= START_SAVINGS_MONTH) {
-    cumulativeSavings = (data.cumulativeSavings !== undefined && data.cumulativeSavings !== 0)
-      ? data.cumulativeSavings
-      : computeCumulativeSavingsLocally();
+  let savingsStartMonth = null;
+
+  if (data.cumulativeSavings !== undefined) {
+    cumulativeSavings = data.cumulativeSavings;
+    savingsStartMonth = data.savingsStartMonth !== undefined ? data.savingsStartMonth : null;
   } else {
-    cumulativeSavings = 0;
+    const localCum = computeCumulativeSavingsLocally();
+    cumulativeSavings = localCum.cumulativeSavings;
+    savingsStartMonth = localCum.savingsStartMonth;
+  }
+
+  // Nếu chưa xác định được savingsStartMonth nhưng tháng hiện tại hoặc cache có giao dịch
+  if (savingsStartMonth === null && (monthTransactions.length > 0 || incomeSum > 0 || expenseSum > 0)) {
+    savingsStartMonth = currentMonth;
+  }
+  if (savingsStartMonth === null) {
+    const localCum = computeCumulativeSavingsLocally();
+    if (localCum.savingsStartMonth !== null) {
+      savingsStartMonth = localCum.savingsStartMonth;
+      if (data.cumulativeSavings === undefined) {
+        cumulativeSavings = localCum.cumulativeSavings;
+      }
+    }
   }
 
   // 2. Hiển thị Lưới 3 chỉ số tài chính
@@ -775,25 +813,27 @@ function renderFinancialViews(data = {}) {
     monthSavingsAmount.className = "stat-value is-negative";
   }
 
-  // 3. Hiển thị Tiền tiết kiệm cộng dồn tích lũy (tính từ tháng 11)
-  if (currentMonth < START_SAVINGS_MONTH) {
+  // 3. Hiển thị Tiền tiết kiệm cộng dồn tích lũy (tính từ tháng có giao dịch)
+  const cumSign = cumulativeSavings >= 0 ? "+" : "-";
+  const cumClass = cumulativeSavings >= 0 ? "cum-amount" : "cum-amount is-negative";
+
+  if (savingsStartMonth === null) {
     cumulativeSavingsAmount.innerText = "0 ₫";
     cumulativeSavingsAmount.className = "cum-amount";
-  } else if (cumulativeSavings >= 0) {
-    cumulativeSavingsAmount.innerText = `+ ${formatCurrencyNumber(cumulativeSavings)} ₫`;
-    cumulativeSavingsAmount.className = "cum-amount";
   } else {
-    cumulativeSavingsAmount.innerText = `- ${formatCurrencyNumber(Math.abs(cumulativeSavings))} ₫`;
-    cumulativeSavingsAmount.className = "cum-amount is-negative";
+    cumulativeSavingsAmount.innerText = `${cumSign} ${formatCurrencyNumber(Math.abs(cumulativeSavings))} ₫`;
+    cumulativeSavingsAmount.className = cumClass;
   }
 
   // Cập nhật nhãn phụ của khối cộng dồn
   const cumSubtitleEl = document.getElementById("cumSubtitleText");
   if (cumSubtitleEl) {
-    if (currentMonth < START_SAVINGS_MONTH) {
-      cumSubtitleEl.innerText = "Bắt đầu tính lũy kế từ Tháng 11";
+    if (savingsStartMonth === null) {
+      cumSubtitleEl.innerText = "Tích lũy từ tháng có giao dịch";
+    } else if (currentMonth === savingsStartMonth) {
+      cumSubtitleEl.innerText = `Tích lũy Tháng ${String(savingsStartMonth).padStart(2, "0")}`;
     } else {
-      cumSubtitleEl.innerText = `Tích lũy từ Tháng 11 đến hết Tháng ${String(currentMonth).padStart(2, "0")}`;
+      cumSubtitleEl.innerText = `Tích lũy từ Tháng ${String(savingsStartMonth).padStart(2, "0")} đến hết Tháng ${String(currentMonth).padStart(2, "0")}`;
     }
   }
 
@@ -803,7 +843,7 @@ function renderFinancialViews(data = {}) {
   // 4. Render danh sách và phân tích chi tiêu
   renderTransactionsList();
   renderCategoryBreakdown(expenseSum);
-  renderSalarySavingsBreakdown(incomeSum, expenseSum, monthSavings, cumulativeSavings);
+  renderSalarySavingsBreakdown(incomeSum, expenseSum, monthSavings, cumulativeSavings, savingsStartMonth);
 }
 
 // Render danh sách giao dịch trong tháng
@@ -917,7 +957,7 @@ function renderCategoryBreakdown(totalExpense) {
 }
 
 // Render phân tích Cơ cấu Tiền lương & Tiết kiệm (Tách riêng 2 khoản này thành 1 cơ cấu độc lập)
-function renderSalarySavingsBreakdown(income, expense, savings, cumulative) {
+function renderSalarySavingsBreakdown(income, expense, savings, cumulative, startMonth = null) {
   if (!salarySavingsBreakdownContainer) return;
 
   let expensePercent = 0;
@@ -991,17 +1031,19 @@ function renderSalarySavingsBreakdown(income, expense, savings, cumulative) {
     <div class="salary-savings-card">
       <div class="ss-header">
         <span class="ss-title">⭐ Tiết kiệm cộng dồn</span>
-        <span class="ss-amount ${currentMonth < START_SAVINGS_MONTH ? 'text-savings' : cumClass}">
-          ${currentMonth < START_SAVINGS_MONTH ? '0 ₫' : (cumSign + ' ' + formatCurrencyNumber(Math.abs(cumulative)) + ' ₫')}
+        <span class="ss-amount ${startMonth === null ? 'text-savings' : cumClass}">
+          ${startMonth === null ? '0 ₫' : (cumSign + ' ' + formatCurrencyNumber(Math.abs(cumulative)) + ' ₫')}
         </span>
       </div>
       <div class="breakdown-bar-bg">
-        <div class="breakdown-bar-fill" style="width: ${currentMonth < START_SAVINGS_MONTH ? '0%' : '100%'}; background: #2563eb;"></div>
+        <div class="breakdown-bar-fill" style="width: ${startMonth === null ? '0%' : '100%'}; background: #2563eb;"></div>
       </div>
       <div class="ss-desc">
-        ${currentMonth < START_SAVINGS_MONTH 
-          ? 'Bắt đầu tính lũy kế từ Tháng 11.' 
-          : `Tổng số tiền tiết kiệm tích lũy từ Tháng 11 đến hết Tháng ${String(currentMonth).padStart(2, '0')}.`}
+        ${startMonth === null 
+          ? 'Chưa có giao dịch tích lũy nào.' 
+          : (currentMonth === startMonth 
+              ? `Số tiền tiết kiệm tích lũy trong Tháng ${String(startMonth).padStart(2, '0')}.` 
+              : `Tổng số tiền tiết kiệm tích lũy từ Tháng ${String(startMonth).padStart(2, '0')} đến hết Tháng ${String(currentMonth).padStart(2, '0')}.`)}
       </div>
     </div>
   `;
