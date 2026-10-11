@@ -2,12 +2,14 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Quản Lý Chi Tiêu</title>
   <meta name="theme-color" content="#1e40af">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Chi Tiêu">
+  <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="logo.png">
   <link rel="apple-touch-icon" href="logo.png">
   <link rel="stylesheet" href="style.css">
@@ -43,6 +45,26 @@
         <button id="btnCloseSyncBanner" class="sync-banner-close" title="Đóng thông báo">✕</button>
       </div>
     </div>
+
+    <!-- THANH ĐIỀU HƯỚNG TAB TRÊN ĐIỆN THOẠI (ẨN TRÊN MÁY TÍNH) -->
+    <nav class="mobile-nav-bar" id="mobileNavBar">
+      <button type="button" class="mobile-nav-btn active" data-tab="all">
+        <span class="m-icon">📱</span>
+        <span class="m-text">Tất cả</span>
+      </button>
+      <button type="button" class="mobile-nav-btn" data-tab="entry">
+        <span class="m-icon">✏️</span>
+        <span class="m-text">Nhập chi</span>
+      </button>
+      <button type="button" class="mobile-nav-btn" data-tab="list">
+        <span class="m-icon">📋</span>
+        <span class="m-text">Danh sách</span>
+      </button>
+      <button type="button" class="mobile-nav-btn" data-tab="stats">
+        <span class="m-icon">📊</span>
+        <span class="m-text">Thống kê</span>
+      </button>
+    </nav>
 
     <!-- BỐ CỤC 2 CỘT (TRÁI: NHẬP LIỆU & TỔNG QUAN | PHẢI: THỐNG KÊ & DANH SÁCH) -->
     <div class="dashboard-grid">
@@ -107,7 +129,7 @@
         </section>
 
         <!-- Form Thêm Chi Tiêu / Tiền Lương Mới -->
-        <main class="card">
+        <main class="card" id="formEntryCard">
           <div class="card-title">
             <span id="formTitleIcon">✏️</span>
             <span id="formTitleText">Nhập giao dịch tài chính</span>
@@ -177,7 +199,7 @@
       <!-- CỘT PHẢI (RIGHT) -->
       <div class="col-right">
         <!-- Thẻ Thống Kê Cơ Cấu Danh Mục Chi Tiêu -->
-        <section class="card">
+        <section class="card" id="categoryBreakdownCard">
           <div class="card-title">
             <span>📊</span>
             <span>Cơ cấu chi tiêu theo danh mục</span>
@@ -189,7 +211,7 @@
         </section>
 
         <!-- Thẻ Cơ Cấu Tiền Lương & Tiết Kiệm (Tách riêng thành 1 cơ cấu độc lập) -->
-        <section class="card">
+        <section class="card" id="salarySavingsBreakdownCard">
           <div class="card-title" style="justify-content: space-between;">
             <div style="display: flex; align-items: center; gap: 8px;">
               <span>⚖️</span>
@@ -217,7 +239,7 @@
         </section>
 
         <!-- Thẻ Toàn Bộ Danh Sách Giao Dịch Trong Tháng -->
-        <section class="card">
+        <section class="card" id="transactionsListCard">
           <div class="card-title" style="justify-content: space-between;">
             <div style="display: flex; align-items: center; gap: 8px;">
               <span>📋</span>

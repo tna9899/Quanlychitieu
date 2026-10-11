@@ -1370,3 +1370,18 @@ setInterval(() => {
     syncMonthDataFromServer(true);
   }
 }, 60000);
+
+// ================= 12. THANH ĐIỀU HƯỚNG TAB TRÊN ĐIỆN THOẠI =================
+const mobileNavBar = document.getElementById("mobileNavBar");
+if (mobileNavBar) {
+  const tabBtns = mobileNavBar.querySelectorAll(".mobile-nav-btn");
+  tabBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      tabBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const tab = btn.getAttribute("data-tab") || "all";
+      document.body.classList.remove("tab-all", "tab-entry", "tab-list", "tab-stats");
+      document.body.classList.add(`tab-${tab}`);
+    });
+  });
+}
