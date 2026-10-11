@@ -12,7 +12,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="logo.png">
   <link rel="apple-touch-icon" href="logo.png">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=2.2">
 </head>
 <body>
   <div class="app-container">
@@ -248,7 +248,7 @@
           </div>
 
           <!-- Thanh liên kết Google Sheets & Trạng thái cập nhật -->
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 6px 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+          <div class="sheet-sync-status-bar">
             <a id="linkOpenSheet" href="#" target="_blank" class="btn-open-sheet-tag">📊 Mở Google Sheet ↗</a>
             <span id="lastSyncTimeText" style="font-size: 0.72rem; color: #64748b;">✅ Tự động cập nhật: 00:00</span>
           </div>
@@ -344,6 +344,6 @@
     <span id="toastMessage">Đã đồng bộ thành công!</span>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2.2"></script>
 </body>
 </html>
