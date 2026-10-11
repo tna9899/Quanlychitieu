@@ -1,4 +1,4 @@
-// Biểu tượng tương ứng cho từng danh mục
+// 8 Danh mục cố định và biểu tượng tương ứng
 const CATEGORY_ICONS = {
   "Ăn uống": "🍜",
   "Di chuyển": "🛵",
@@ -12,11 +12,39 @@ const CATEGORY_ICONS = {
 
 const STORAGE_KEYS = {
   API_URL: "qly_expense_api_url",
-  RECENT_ITEMS: "qly_expense_recent_items",
-  MONTH_TOTAL: "qly_expense_month_total"
+  LAST_YEAR: "qly_expense_selected_year",
+  LAST_MONTH: "qly_expense_selected_month"
 };
 
+// State toàn cục của ứng dụng
+let currentYear = new Date().getFullYear();
+let currentMonth = new Date().getMonth() + 1; // 1 - 12
+let monthTransactions = []; // Danh sách chi tiêu lấy từ Google Sheets
+let categoryTotals = [];    // Tổng theo từng danh mục
+let activeCatFilter = "ALL";
+let searchKeyword = "";
+let isSyncing = false;
+
 // DOM Elements
+const btnPrevMonth = document.getElementById("btnPrevMonth");
+const btnNextMonth = document.getElementById("btnNextMonth");
+const currentMonthText = document.getElementById("currentMonthText");
+const totalMonthAmount = document.getElementById("totalMonthAmount");
+const entryCountText = document.getElementById("entryCountText");
+const listTotalHeader = document.getElementById("listTotalHeader");
+const listTitleMonth = document.getElementById("listTitleMonth");
+const tabCountBadge = document.getElementById("tabCountBadge");
+const btnSyncServer = document.getElementById("btnSyncServer");
+const syncText = document.getElementById("syncText");
+
+const connectionStatus = document.getElementById("connectionStatus");
+const statusText = document.getElementById("statusText");
+
+// Tabs
+const tabButtons = document.querySelectorAll(".tab-btn");
+const tabPanes = document.querySelectorAll(".tab-pane");
+
+// Form Elements
 const expenseForm = document.getElementById("expenseForm");
 const expenseDate = document.getElementById("expenseDate");
 const expenseAmount = document.getElementById("expenseAmount");
@@ -28,16 +56,14 @@ const btnSpinner = document.getElementById("btnSpinner");
 const categoryOptions = document.querySelectorAll(".category-option");
 const chipButtons = document.querySelectorAll(".chip-btn[data-add]");
 const btnClearAmount = document.getElementById("btnClearAmount");
-const recentList = document.getElementById("recentList");
-const btnClearHistory = document.getElementById("btnClearHistory");
-const totalMonthAmount = document.getElementById("totalMonthAmount");
-const entryCountText = document.getElementById("entryCountText");
-const currentMonthText = document.getElementById("currentMonthText");
-const refreshSummary = document.getElementById("refreshSummary");
-const connectionStatus = document.getElementById("connectionStatus");
-const statusText = document.getElementById("statusText");
 
-// Modal elements
+// List & Filter Elements
+const searchTransactionInput = document.getElementById("searchTransactionInput");
+const filterPills = document.querySelectorAll(".filter-pill");
+const transactionsContainer = document.getElementById("transactionsContainer");
+const categoryBreakdownContainer = document.getElementById("categoryBreakdownContainer");
+
+// Modal Elements
 const btnSettings = document.getElementById("btnSettings");
 const settingsModal = document.getElementById("settingsModal");
 const btnCloseSettings = document.getElementById("btnCloseSettings");
@@ -50,37 +76,83 @@ const toast = document.getElementById("toast");
 const toastMessage = document.getElementById("toastMessage");
 const toastIcon = document.getElementById("toastIcon");
 
-// --- 1. KHỞI TẠO MẶC ĐỊNH ---
+// --- 1. KHỞI CHẠY ỨNG DỤNG ---
 function initApp() {
-  // Đặt ngày hôm nay theo giờ địa phương YYYY-MM-DD
   const today = new Date();
   const yyyy = today.getFullYear();
   const mm = String(today.getMonth() + 1).padStart(2, "0");
   const dd = String(today.getDate()).padStart(2, "0");
   expenseDate.value = `${yyyy}-${mm}-${dd}`;
-  currentMonthText.innerText = `Tháng ${mm}-${yyyy}`;
 
-  // Tải cấu hình API
-  const savedUrl = localStorage.getItem(STORAGE_KEYS.API_URL) || "";
+  currentYear = yyyy;
+  currentMonth = today.getMonth() + 1;
+
+  updateMonthDisplay();
+
+  // Đọc URL đã lưu
+  const savedUrl = (localStorage.getItem(STORAGE_KEYS.API_URL) || "").trim();
   apiUrlInput.value = savedUrl;
   updateConnectionUI(Boolean(savedUrl));
 
-  // Tải danh sách giao dịch gần đây
-  renderRecentItems();
-  updateMonthSummary();
+  // Tải dữ liệu từ cache local trước để hiển thị tức thì
+  loadMonthCache();
 
-  // Thử đồng bộ tổng chi tiêu từ server nếu đã có URL
+  // Đồng bộ dữ liệu mới nhất từ Google Sheets
   if (savedUrl) {
-    fetchMonthSummaryFromServer(savedUrl);
+    syncMonthDataFromServer();
   }
 }
 
-// Format số tiền có dấu phẩy ngăn cách hàng nghìn (ví dụ: 50,000)
+// Cập nhật nhãn tháng trên giao diện
+function updateMonthDisplay() {
+  const mmStr = String(currentMonth).padStart(2, "0");
+  const text = `Tháng ${mmStr}-${currentYear}`;
+  currentMonthText.innerText = text;
+  listTitleMonth.innerText = `Các khoản chi ${text}`;
+}
+
+// Chuyển tháng trước
+btnPrevMonth.addEventListener("click", () => {
+  currentMonth--;
+  if (currentMonth < 1) {
+    currentMonth = 12;
+    currentYear--;
+  }
+  updateMonthDisplay();
+  loadMonthCache();
+  syncMonthDataFromServer();
+});
+
+// Chuyển tháng sau
+btnNextMonth.addEventListener("click", () => {
+  currentMonth++;
+  if (currentMonth > 12) {
+    currentMonth = 1;
+    currentYear++;
+  }
+  updateMonthDisplay();
+  loadMonthCache();
+  syncMonthDataFromServer();
+});
+
+// Chuyển đổi giữa các Tab
+tabButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    tabButtons.forEach((b) => b.classList.remove("active"));
+    tabPanes.forEach((p) => p.classList.remove("active"));
+
+    btn.classList.add("active");
+    const targetId = btn.getAttribute("data-tab");
+    const targetPane = document.getElementById(targetId);
+    if (targetPane) targetPane.classList.add("active");
+  });
+});
+
+// --- 2. FORMAT TIỀN TỆ & CÁC NÚT BẤM NHANH ---
 function formatCurrencyNumber(value) {
-  if (!value) return "";
-  const cleanNumber = value.toString().replace(/\D/g, "");
-  if (!cleanNumber) return "";
-  return Number(cleanNumber).toLocaleString("vi-VN");
+  if (value === undefined || value === null) return "0";
+  const num = Number(value.toString().replace(/\D/g, "")) || 0;
+  return num.toLocaleString("vi-VN");
 }
 
 function parseCurrencyNumber(formattedString) {
@@ -88,25 +160,20 @@ function parseCurrencyNumber(formattedString) {
   return Number(formattedString.toString().replace(/\D/g, "")) || 0;
 }
 
-// Xử lý khi người dùng gõ vào ô số tiền
 expenseAmount.addEventListener("input", (e) => {
   const cursorPosition = e.target.selectionStart;
   const originalLength = e.target.value.length;
   const formatted = formatCurrencyNumber(e.target.value);
   e.target.value = formatted;
-  
-  // Giữ vị trí con trỏ hợp lý
   const newLength = formatted.length;
   e.target.setSelectionRange(cursorPosition + (newLength - originalLength), cursorPosition + (newLength - originalLength));
 });
 
-// Xử lý các nút bấm nhanh tiền (+10k, +20k,...)
 chipButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
     const addVal = Number(btn.getAttribute("data-add")) || 0;
     const currentVal = parseCurrencyNumber(expenseAmount.value);
-    const newVal = currentVal + addVal;
-    expenseAmount.value = formatCurrencyNumber(newVal);
+    expenseAmount.value = formatCurrencyNumber(currentVal + addVal);
   });
 });
 
@@ -115,7 +182,7 @@ btnClearAmount.addEventListener("click", () => {
   expenseAmount.focus();
 });
 
-// Xử lý chọn danh mục
+// Chọn danh mục chi tiêu
 categoryOptions.forEach((opt) => {
   opt.addEventListener("click", () => {
     categoryOptions.forEach((o) => o.classList.remove("selected"));
@@ -124,75 +191,248 @@ categoryOptions.forEach((opt) => {
   });
 });
 
-// --- 2. XỬ LÝ LƯU GIAO DỊCH GẦN ĐÂY ---
-function getRecentItems() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.RECENT_ITEMS)) || [];
-  } catch {
-    return [];
-  }
-}
-
-function saveRecentItem(item) {
-  const list = getRecentItems();
-  list.unshift(item); // Thêm lên đầu
-  if (list.length > 20) list.pop(); // Giữ tối đa 20 mục
-  localStorage.setItem(STORAGE_KEYS.RECENT_ITEMS, JSON.stringify(list));
-  renderRecentItems();
-  updateMonthSummary();
-}
-
-function renderRecentItems() {
-  const list = getRecentItems();
-  if (!list.length) {
-    recentList.innerHTML = `<div class="empty-state">Chưa có khoản chi nào được thêm gần đây.</div>`;
+// --- 3. ĐỒNG BỘ DỮ LIỆU TỪ GOOGLE SHEETS ---
+async function syncMonthDataFromServer() {
+  const apiUrl = (localStorage.getItem(STORAGE_KEYS.API_URL) || "").trim();
+  if (!apiUrl) {
+    updateConnectionUI(false);
     return;
   }
 
-  recentList.innerHTML = list.map((item) => {
+  if (isSyncing) return;
+  setSyncingState(true);
+
+  try {
+    const targetUrl = `${apiUrl}?action=getMonthData&year=${currentYear}&month=${currentMonth}`;
+    const res = await fetch(targetUrl);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const data = await res.json();
+    if (data && data.success) {
+      monthTransactions = data.transactions || [];
+      categoryTotals = data.categories || [];
+
+      // Cập nhật cache local
+      saveMonthCache(data);
+
+      // Render lại giao diện
+      renderAllViews(data.total);
+      updateConnectionUI(true);
+    } else {
+      throw new Error(data.error || "Không thể nạp dữ liệu từ Google Sheets");
+    }
+  } catch (err) {
+    console.warn("Lỗi đồng bộ từ server:", err);
+    showToast("Không thể tải dữ liệu từ Google Sheets: " + err.message, "error");
+  } finally {
+    setSyncingState(false);
+  }
+}
+
+btnSyncServer.addEventListener("click", () => {
+  syncMonthDataFromServer();
+});
+
+function setSyncingState(syncing) {
+  isSyncing = syncing;
+  if (syncing) {
+    btnSyncServer.classList.add("spinning");
+    syncText.innerText = "Đang tải...";
+  } else {
+    btnSyncServer.classList.remove("spinning");
+    syncText.innerText = "Đồng bộ";
+  }
+}
+
+// Quản lý bộ nhớ đệm (Cache) theo tháng
+function getCacheKey() {
+  return `qly_cache_${currentYear}_${currentMonth}`;
+}
+
+function saveMonthCache(data) {
+  try {
+    localStorage.setItem(getCacheKey(), JSON.stringify(data));
+  } catch (e) {}
+}
+
+function loadMonthCache() {
+  try {
+    const raw = localStorage.getItem(getCacheKey());
+    if (raw) {
+      const data = JSON.parse(raw);
+      monthTransactions = data.transactions || [];
+      categoryTotals = data.categories || [];
+      renderAllViews(data.total);
+      return;
+    }
+  } catch (e) {}
+
+  monthTransactions = [];
+  categoryTotals = [];
+  renderAllViews(0);
+}
+
+// --- 4. HIỂN THỊ DỮ LIỆU LÊN GIAO DIỆN ---
+function renderAllViews(totalAmount) {
+  const computedTotal = totalAmount !== undefined ? totalAmount : monthTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+  const formattedTotal = `${formatCurrencyNumber(computedTotal)} ₫`;
+
+  totalMonthAmount.innerText = formattedTotal;
+  listTotalHeader.innerText = formattedTotal;
+  entryCountText.innerText = `${monthTransactions.length} khoản chi trên Drive`;
+  tabCountBadge.innerText = monthTransactions.length;
+
+  renderTransactionsList();
+  renderCategoryBreakdown(computedTotal);
+}
+
+// Render danh sách chi tiêu trong tháng
+function renderTransactionsList() {
+  if (!transactionsContainer) return;
+
+  // Lọc theo danh mục và từ khóa tìm kiếm
+  let filtered = monthTransactions.filter((item) => {
+    const matchCategory = activeCatFilter === "ALL" || item.category === activeCatFilter;
+    const query = searchKeyword.toLowerCase();
+    const matchSearch = !query || 
+      (item.note && item.note.toLowerCase().includes(query)) ||
+      (item.category && item.category.toLowerCase().includes(query)) ||
+      (item.date && item.date.includes(query)) ||
+      (item.amount && item.amount.toString().includes(query));
+    return matchCategory && matchSearch;
+  });
+
+  if (filtered.length === 0) {
+    if (monthTransactions.length === 0) {
+      transactionsContainer.innerHTML = `
+        <div class="empty-state">
+          <p>Chưa có khoản chi nào trong Tháng ${String(currentMonth).padStart(2, "0")}-${currentYear}.</p>
+          <p style="margin-top: 6px; font-size: 0.75rem;">Hãy chuyển sang tab <strong>Thêm mới</strong> để ghi lại chi tiêu đầu tiên!</p>
+        </div>
+      `;
+    } else {
+      transactionsContainer.innerHTML = `<div class="empty-state">Không tìm thấy khoản chi nào phù hợp với bộ lọc.</div>`;
+    }
+    return;
+  }
+
+  // Sắp xếp mới nhất lên đầu (theo ngày giảm dần)
+  filtered.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+  transactionsContainer.innerHTML = filtered.map((item) => {
     const icon = CATEGORY_ICONS[item.category] || "💸";
-    const noteText = item.note ? ` • ${escapeHtml(item.note)}` : "";
+    const noteDisplay = item.note ? escapeHtml(item.note) : "(Không ghi chú)";
     return `
-      <div class="recent-item">
-        <div class="recent-item-left">
-          <div class="recent-icon">${icon}</div>
-          <div class="recent-details">
-            <h4>${escapeHtml(item.category)}</h4>
-            <p>${item.date}${noteText}</p>
+      <div class="transaction-card">
+        <div class="trans-left">
+          <div class="trans-icon-box">${icon}</div>
+          <div class="trans-info">
+            <div class="trans-info-top">
+              <span class="trans-category">${escapeHtml(item.category)}</span>
+              <span class="trans-date">${item.date || ""}</span>
+            </div>
+            <div class="trans-note" title="${noteDisplay}">${noteDisplay}</div>
           </div>
         </div>
-        <div class="recent-amount">-${formatCurrencyNumber(item.amount)} ₫</div>
+        <div class="trans-right">
+          <span class="trans-amount">-${formatCurrencyNumber(item.amount)} ₫</span>
+          <button class="btn-delete-trans" title="Xóa khoản chi này trên Google Sheets" onclick="handleDeleteTransaction(${item.row})">🗑️</button>
+        </div>
       </div>
     `;
   }).join("");
 }
 
-function updateMonthSummary() {
-  const list = getRecentItems();
-  const currentMonth = expenseDate.value ? expenseDate.value.substring(0, 7) : new Date().toISOString().substring(0, 7);
-  
-  // Tính tổng các mục thuộc tháng hiện tại trong bộ nhớ tạm
-  const monthItems = list.filter((i) => i.date && i.date.startsWith(currentMonth));
-  const localTotal = monthItems.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
-  
-  const savedServerTotal = Number(localStorage.getItem(STORAGE_KEYS.MONTH_TOTAL)) || 0;
-  const displayTotal = Math.max(localTotal, savedServerTotal);
+// Render cơ cấu chi tiêu danh mục
+function renderCategoryBreakdown(totalMonth) {
+  if (!categoryBreakdownContainer) return;
 
-  totalMonthAmount.innerText = `${formatCurrencyNumber(displayTotal)} ₫`;
-  entryCountText.innerText = `${monthItems.length} khoản chi gần đây`;
+  const validTotal = totalMonth > 0 ? totalMonth : 1;
+
+  // Tính tổng thực tế từng danh mục từ transactions
+  const catSums = {};
+  Object.keys(CATEGORY_ICONS).forEach(c => catSums[c] = 0);
+  monthTransactions.forEach(t => {
+    if (catSums[t.category] !== undefined) {
+      catSums[t.category] += Number(t.amount) || 0;
+    } else {
+      catSums[t.category] = (catSums[t.category] || 0) + (Number(t.amount) || 0);
+    }
+  });
+
+  const sortedCats = Object.keys(catSums).map(name => ({
+    name: name,
+    total: catSums[name],
+    percent: Math.round((catSums[name] / validTotal) * 100)
+  })).sort((a, b) => b.total - a.total);
+
+  if (totalMonth === 0) {
+    categoryBreakdownContainer.innerHTML = `<div class="empty-state">Chưa có chi tiêu nào trong tháng để phân tích.</div>`;
+    return;
+  }
+
+  categoryBreakdownContainer.innerHTML = sortedCats.map(cat => {
+    const icon = CATEGORY_ICONS[cat.name] || "💸";
+    return `
+      <div class="breakdown-item">
+        <div class="breakdown-header">
+          <span>${icon} ${cat.name} (${cat.percent}%)</span>
+          <span style="font-weight: 700; color: #1e40af;">${formatCurrencyNumber(cat.total)} ₫</span>
+        </div>
+        <div class="breakdown-bar-bg">
+          <div class="breakdown-bar-fill" style="width: ${cat.percent}%;"></div>
+        </div>
+      </div>
+    `;
+  }).join("");
 }
 
-btnClearHistory.addEventListener("click", () => {
-  if (confirm("Bạn có chắc chắn muốn xóa danh sách hiển thị gần đây trên thiết bị này không? (Dữ liệu trên Google Sheet vẫn giữ nguyên)")) {
-    localStorage.removeItem(STORAGE_KEYS.RECENT_ITEMS);
-    localStorage.removeItem(STORAGE_KEYS.MONTH_TOTAL);
-    renderRecentItems();
-    updateMonthSummary();
-    showToast("Đã làm sạch lịch sử hiển thị!", "success");
-  }
+// Xử lý tìm kiếm & lọc danh mục
+searchTransactionInput.addEventListener("input", (e) => {
+  searchKeyword = e.target.value.trim();
+  renderTransactionsList();
 });
 
-// --- 3. GỬI DỮ LIỆU ĐẾN GOOGLE APPS SCRIPT ---
+filterPills.forEach((pill) => {
+  pill.addEventListener("click", () => {
+    filterPills.forEach((p) => p.classList.remove("active"));
+    pill.classList.add("active");
+    activeCatFilter = pill.getAttribute("data-cat");
+    renderTransactionsList();
+  });
+});
+
+// Xử lý xóa khoản chi
+window.handleDeleteTransaction = async function(row) {
+  if (!confirm(`Bạn có chắc chắn muốn xóa dòng chi tiêu này khỏi Google Sheets không?`)) {
+    return;
+  }
+
+  const apiUrl = (localStorage.getItem(STORAGE_KEYS.API_URL) || "").trim();
+  if (!apiUrl) {
+    showToast("Chưa cấu hình URL Google Apps Script!", "error");
+    return;
+  }
+
+  showToast("Đang xóa trên Google Sheets...", "success");
+
+  try {
+    const deleteUrl = `${apiUrl}?action=delete&year=${currentYear}&month=${currentMonth}&row=${row}`;
+    const res = await fetch(deleteUrl);
+    const result = await res.json();
+    if (result && result.success) {
+      showToast("Đã xóa chi tiêu thành công!", "success");
+      // Tải lại dữ liệu mới nhất
+      syncMonthDataFromServer();
+    } else {
+      throw new Error(result.error || "Không thể xóa dòng");
+    }
+  } catch (e) {
+    showToast("Lỗi khi xóa: " + e.message, "error");
+  }
+};
+
+// --- 5. GỬI CHI TIÊU MỚI LÊN GOOGLE SHEETS ---
 expenseForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -202,7 +442,7 @@ expenseForm.addEventListener("submit", async (e) => {
   const noteVal = expenseNote.value.trim();
 
   if (!amountVal || amountVal <= 0) {
-    showToast("Vui lòng nhập số tiền hợp lệ lớn hơn 0!", "error");
+    showToast("Vui lòng nhập số tiền hợp lệ!", "error");
     expenseAmount.focus();
     return;
   }
@@ -211,48 +451,40 @@ expenseForm.addEventListener("submit", async (e) => {
     date: dateVal,
     category: categoryVal,
     amount: amountVal,
-    note: noteVal,
-    device: navigator.userAgent
+    note: noteVal
   };
 
   const apiUrl = (localStorage.getItem(STORAGE_KEYS.API_URL) || "").trim();
-
-  // Bật trạng thái Loading
   setLoadingState(true);
 
   try {
     if (apiUrl) {
-      // Gửi POST tới Google Apps Script Web App
-      // Lưu ý: Dùng text/plain để tránh preflight CORS block của Google
       await fetch(apiUrl, {
         method: "POST",
         mode: "no-cors",
-        headers: {
-          "Content-Type": "text/plain;charset=utf-8"
-        },
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload)
       });
-      showToast("Đã lưu thành công vào Google Sheet!", "success");
+      showToast("Đã lưu & đồng bộ thành công vào Google Sheet!", "success");
     } else {
-      showToast("Đã lưu cục bộ! (Chưa cài đặt URL Google Apps Script)", "error");
+      showToast("Chưa có URL Google Apps Script để đồng bộ!", "error");
       openSettings();
     }
 
-    // Lưu vào lịch sử hiển thị
-    saveRecentItem(payload);
-
-    // Reset lại form nhưng giữ nguyên ngày đã chọn
+    // Reset lại ô số tiền và ghi chú
     expenseAmount.value = "";
     expenseNote.value = "";
     expenseAmount.focus();
 
-    // Làm mới số liệu tổng
-    if (apiUrl) {
-      setTimeout(() => fetchMonthSummaryFromServer(apiUrl), 1500);
+    // Tải lại ngay lập tức danh sách chi tiêu của tháng đó
+    const inputYear = parseInt(dateVal.split("-")[0]);
+    const inputMonth = parseInt(dateVal.split("-")[1]);
+    if (inputYear === currentYear && inputMonth === currentMonth) {
+      setTimeout(() => syncMonthDataFromServer(), 1200);
     }
   } catch (err) {
     console.error("Lỗi gửi dữ liệu:", err);
-    showToast("Lỗi kết nối khi gửi dữ liệu: " + err.message, "error");
+    showToast("Lỗi gửi dữ liệu: " + err.message, "error");
   } finally {
     setLoadingState(false);
   }
@@ -264,44 +496,12 @@ function setLoadingState(isLoading) {
     btnSubmitText.innerText = "Đang lưu lên Drive...";
     btnSpinner.style.display = "block";
   } else {
-    btnSubmitText.innerText = "💾 Lưu chi tiêu";
+    btnSubmitText.innerText = "💾 Lưu & Đồng bộ lên Drive";
     btnSpinner.style.display = "none";
   }
 }
 
-// --- 4. KẾT NỐI VÀ ĐỒNG BỘ GOOGLE APPS SCRIPT ---
-async function fetchMonthSummaryFromServer(url) {
-  try {
-    const today = new Date();
-    const targetUrl = `${url}?action=summary&year=${today.getFullYear()}&month=${today.getMonth() + 1}`;
-    const res = await fetch(targetUrl);
-    if (res.ok) {
-      const data = await res.json();
-      if (data && typeof data.total === "number") {
-        localStorage.setItem(STORAGE_KEYS.MONTH_TOTAL, data.total);
-        totalMonthAmount.innerText = `${formatCurrencyNumber(data.total)} ₫`;
-        if (data.count) {
-          entryCountText.innerText = `${data.count} khoản chi trên Drive`;
-        }
-        updateConnectionUI(true);
-      }
-    }
-  } catch (e) {
-    console.warn("Chưa lấy được tổng tự động từ server:", e);
-  }
-}
-
-refreshSummary.addEventListener("click", () => {
-  const url = localStorage.getItem(STORAGE_KEYS.API_URL);
-  if (url) {
-    showToast("Đang đồng bộ số liệu...", "success");
-    fetchMonthSummaryFromServer(url);
-  } else {
-    updateMonthSummary();
-  }
-});
-
-// --- 5. CÀI ĐẶT MODAL & TEST KẾT NỐI ---
+// --- 6. CÀI ĐẶT & TEST KẾT NỐI ---
 function openSettings() {
   settingsModal.classList.add("active");
   apiUrlInput.value = localStorage.getItem(STORAGE_KEYS.API_URL) || "";
@@ -324,7 +524,7 @@ btnSaveSettings.addEventListener("click", () => {
     localStorage.setItem(STORAGE_KEYS.API_URL, url);
     updateConnectionUI(true);
     showToast("Đã lưu URL kết nối thành công!", "success");
-    fetchMonthSummaryFromServer(url);
+    syncMonthDataFromServer();
   } else {
     localStorage.removeItem(STORAGE_KEYS.API_URL);
     updateConnectionUI(false);
@@ -350,11 +550,10 @@ btnTestConnection.addEventListener("click", async () => {
       showToast("Kết nối Google Apps Script thành công! ✓", "success");
       updateConnectionUI(true);
     } else {
-      showToast("Đã kết nối được tới script!", "success");
+      showToast("Kết nối thành công! ✓", "success");
     }
   } catch (e) {
-    // Nếu bị CORS hoặc gọi được nhưng dạng get
-    showToast("URL phản hồi. Bạn có thể bấm Lưu cài đặt để sử dụng!", "success");
+    showToast("Đã phản hồi. Hãy bấm Lưu cài đặt để bắt đầu đồng bộ!", "success");
   } finally {
     btnTestConnection.innerText = "Thử kết nối";
     btnTestConnection.disabled = false;
@@ -364,22 +563,20 @@ btnTestConnection.addEventListener("click", async () => {
 function updateConnectionUI(isConnected) {
   if (isConnected) {
     connectionStatus.className = "status-pill status-connected";
-    statusText.innerText = "Đã kết nối Drive";
+    statusText.innerText = "Đã kết nối";
   } else {
     connectionStatus.className = "status-pill status-disconnected";
     statusText.innerText = "Chưa kết nối";
   }
 }
 
-// --- 6. TOAST NOTIFICATION ---
+// --- 7. TOAST NOTIFICATION ---
 let toastTimeout = null;
 function showToast(message, type = "success") {
   if (toastTimeout) clearTimeout(toastTimeout);
-  
   toastMessage.innerText = message;
   toast.className = `toast ${type === "success" ? "toast-success" : "toast-error"} show`;
   toastIcon.innerText = type === "success" ? "✓" : "⚠️";
-
   toastTimeout = setTimeout(() => {
     toast.classList.remove("show");
   }, 3500);
@@ -391,5 +588,5 @@ function escapeHtml(str) {
   );
 }
 
-// Khởi chạy
+// Khởi chạy khi tài liệu sẵn sàng
 initApp();
