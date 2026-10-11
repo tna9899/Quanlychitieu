@@ -29,19 +29,20 @@ let activeCatFilter = "ALL";
 let searchKeyword = "";
 let isSyncing = false;
 let currentEntryType = "expense"; // "expense" (-) hoặc "income" (+)
-let syncBannerTimer = null;
+let syncCountdownInterval = null;
+let syncCountdownSeconds = 3;
 
 // DOM Elements: Header & Status
 const connectionStatus = document.getElementById("connectionStatus");
 const statusText = document.getElementById("statusText");
-const btnOpenSheet = document.getElementById("btnOpenSheet");
 const linkOpenSheet = document.getElementById("linkOpenSheet");
 const btnSettings = document.getElementById("btnSettings");
 const lastSyncTimeText = document.getElementById("lastSyncTimeText");
 
-// DOM Elements: Thanh thông báo đồng bộ
+// DOM Elements: Thanh thông báo đồng bộ (có bộ đếm 3s)
 const syncNotificationBanner = document.getElementById("syncNotificationBanner");
 const syncBannerText = document.getElementById("syncBannerText");
+const syncCountdownBadge = document.getElementById("syncCountdownBadge");
 const btnCloseSyncBanner = document.getElementById("btnCloseSyncBanner");
 
 // DOM Elements: Thẻ tài chính tháng & Tiết kiệm cộng dồn
@@ -92,7 +93,7 @@ const ratioExpensePercent = document.getElementById("ratioExpensePercent");
 const ratioSavingsPercent = document.getElementById("ratioSavingsPercent");
 const salarySavingsBreakdownContainer = document.getElementById("salarySavingsBreakdownContainer");
 
-// DOM Elements: Modal Cài đặt
+// DOM Elements: Modal Cài đặt & Đồng bộ đa thiết bị
 const settingsModal = document.getElementById("settingsModal");
 const btnCloseSettings = document.getElementById("btnCloseSettings");
 const btnSaveSettings = document.getElementById("btnSaveSettings");
@@ -100,6 +101,10 @@ const btnTestConnection = document.getElementById("btnTestConnection");
 const apiUrlInput = document.getElementById("apiUrlInput");
 const gmailAccountInput = document.getElementById("gmailAccountInput");
 const diagResultBox = document.getElementById("diagResultBox");
+const btnCopyShareLink = document.getElementById("btnCopyShareLink");
+const btnToggleQrCode = document.getElementById("btnToggleQrCode");
+const qrCodeContainer = document.getElementById("qrCodeContainer");
+const qrCodeImg = document.getElementById("qrCodeImg");
 
 // Toast Elements
 const toast = document.getElementById("toast");
@@ -198,7 +203,7 @@ async function callGasApi(url, params = {}) {
 
 // ================= 2. KHỞI CHẠY ỨNG DỤNG =================
 
-function initApp() {
+async function initApp() {
   const today = new Date();
   const yyyy = today.getFullYear();
   const mm = String(today.getMonth() + 1).padStart(2, "0");
@@ -208,14 +213,46 @@ function initApp() {
   currentYear = yyyy;
   currentMonth = today.getMonth() + 1;
 
-  // Render các thành phần giao diện
+  // Render các thành phần giao diện ban đầu
   setEntryType("expense");
   renderCategoryGrid(currentMonth, currentYear);
   renderFilterPills(currentMonth, currentYear);
   updateMonthDisplay();
 
-  // Đọc cấu hình lưu trữ
-  const savedUrl = (localStorage.getItem(STORAGE_KEYS.API_URL) || "").trim();
+  // 1. Tự động đồng bộ cấu hình nếu mở qua link chia sẻ (?api=... hoặc ?apiUrl=...)
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramApiUrl = urlParams.get("api") || urlParams.get("apiUrl");
+    const paramEmail = urlParams.get("email");
+    if (paramApiUrl && paramApiUrl.trim()) {
+      localStorage.setItem(STORAGE_KEYS.API_URL, paramApiUrl.trim());
+      if (paramEmail && paramEmail.trim()) {
+        localStorage.setItem(STORAGE_KEYS.EMAIL, paramEmail.trim());
+      }
+      // Dọn dẹp URL trên thanh địa chỉ để giao diện sạch sẽ
+      window.history.replaceState({}, document.title, window.location.pathname);
+      showToast("Đã tự động nhận diện và đồng bộ cấu hình từ thiết bị!", "success");
+    }
+  } catch (e) {}
+
+  // 2. Nếu thiết bị chưa có Web App URL, thử nạp từ file config.json của kho lưu trữ
+  let savedUrl = (localStorage.getItem(STORAGE_KEYS.API_URL) || "").trim();
+  if (!savedUrl) {
+    try {
+      const cfgRes = await fetch("config.json?v=" + Date.now());
+      if (cfgRes.ok) {
+        const cfg = await cfgRes.json();
+        if (cfg && cfg.apiUrl && cfg.apiUrl.trim()) {
+          savedUrl = cfg.apiUrl.trim();
+          localStorage.setItem(STORAGE_KEYS.API_URL, savedUrl);
+          if (cfg.email && !localStorage.getItem(STORAGE_KEYS.EMAIL)) {
+            localStorage.setItem(STORAGE_KEYS.EMAIL, cfg.email.trim());
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
   apiUrlInput.value = savedUrl;
   updateConnectionUI(Boolean(savedUrl));
 
@@ -474,10 +511,6 @@ function openGoogleSheet() {
   window.open(url, "_blank");
 }
 
-if (btnOpenSheet) {
-  btnOpenSheet.addEventListener("click", openGoogleSheet);
-}
-
 // ================= 4. ĐỊNH DẠNG TIỀN TỆ =================
 
 function formatCurrencyNumber(value) {
@@ -503,7 +536,7 @@ expenseAmount.addEventListener("input", (e) => {
   );
 });
 
-// ================= 5. THANH THÔNG BÁO ĐỒNG BỘ =================
+// ================= 5. THANH THÔNG BÁO ĐỒNG BỘ (BỘ ĐẾM 3S TỰ TẮT) =================
 
 function showSyncNotificationBanner(count, income, expense, savings) {
   if (!syncNotificationBanner || !syncBannerText) return;
@@ -513,16 +546,39 @@ function showSyncNotificationBanner(count, income, expense, savings) {
   const savingsFormatted = savingsSign + " " + formatCurrencyNumber(Math.abs(savings)) + " ₫";
 
   syncBannerText.innerText = `Đã đồng bộ Google Sheets lúc ${timeStr} (${count} giao dịch | Tiết kiệm: ${savingsFormatted})`;
+
+  if (syncCountdownInterval) {
+    clearInterval(syncCountdownInterval);
+    syncCountdownInterval = null;
+  }
+
+  syncCountdownSeconds = 3;
+  if (syncCountdownBadge) {
+    syncCountdownBadge.innerText = `${syncCountdownSeconds}s`;
+  }
+
   syncNotificationBanner.style.display = "flex";
 
-  if (syncBannerTimer) clearTimeout(syncBannerTimer);
-  syncBannerTimer = setTimeout(() => {
-    syncNotificationBanner.style.display = "none";
-  }, 9000);
+  syncCountdownInterval = setInterval(() => {
+    syncCountdownSeconds--;
+    if (syncCountdownSeconds > 0) {
+      if (syncCountdownBadge) {
+        syncCountdownBadge.innerText = `${syncCountdownSeconds}s`;
+      }
+    } else {
+      clearInterval(syncCountdownInterval);
+      syncCountdownInterval = null;
+      syncNotificationBanner.style.display = "none";
+    }
+  }, 1000);
 }
 
 if (btnCloseSyncBanner) {
   btnCloseSyncBanner.addEventListener("click", () => {
+    if (syncCountdownInterval) {
+      clearInterval(syncCountdownInterval);
+      syncCountdownInterval = null;
+    }
     if (syncNotificationBanner) syncNotificationBanner.style.display = "none";
   });
 }
@@ -803,9 +859,9 @@ function renderTransactionsList() {
         <div class="trans-single-left">
           <span class="trans-pill-date">${escapeHtml(dateDisplay)}</span>
           <span class="trans-pill-cat">${icon} ${escapeHtml(item.category)}</span>
+          ${item.note ? `<span class="trans-pill-note" title="${escapeHtml(item.note)}">📝 ${escapeHtml(item.note)}</span>` : ""}
         </div>
         <div class="trans-single-right">
-          ${item.note ? `<span class="trans-pill-note" title="${escapeHtml(item.note)}">📝 ${escapeHtml(item.note)}</span>` : ""}
           <span class="${amountClass}">${amountSign} ${formatCurrencyNumber(item.amount)} ₫</span>
           ${item.row ? `
             <button type="button" class="trans-pill-del" title="Xóa giao dịch này" onclick="handleDeleteTransaction(${item.row})">🗑️</button>
@@ -1092,10 +1148,12 @@ function openSettings() {
   gmailAccountInput.value = localStorage.getItem(STORAGE_KEYS.EMAIL) || "";
   diagResultBox.className = "diag-box";
   diagResultBox.innerHTML = "";
+  if (qrCodeContainer) qrCodeContainer.style.display = "none";
 }
 
 function closeSettings() {
   settingsModal.classList.remove("active");
+  if (qrCodeContainer) qrCodeContainer.style.display = "none";
 }
 
 btnSettings.addEventListener("click", openSettings);
@@ -1129,6 +1187,57 @@ btnSaveSettings.addEventListener("click", () => {
   closeSettings();
   syncMonthDataFromServer();
 });
+
+// Sao chép link cài đặt kèm cấu hình URL để gửi sang điện thoại
+if (btnCopyShareLink) {
+  btnCopyShareLink.addEventListener("click", () => {
+    const url = apiUrlInput.value.trim() || (localStorage.getItem(STORAGE_KEYS.API_URL) || "").trim();
+    if (!url) {
+      showToast("Vui lòng nhập Web App URL trước khi sao chép!", "error");
+      return;
+    }
+    const email = (gmailAccountInput ? gmailAccountInput.value.trim() : "") || (localStorage.getItem(STORAGE_KEYS.EMAIL) || "").trim();
+    let shareUrl = window.location.origin + window.location.pathname;
+    if (!shareUrl.endsWith("/")) shareUrl += "/";
+    shareUrl += `?api=${encodeURIComponent(url)}`;
+    if (email) shareUrl += `&email=${encodeURIComponent(email)}`;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        showToast("Đã sao chép link! Hãy gửi link này sang điện thoại để tự động đồng bộ.", "success");
+      }).catch(() => {
+        prompt("Sao chép link này và mở trên điện thoại:", shareUrl);
+      });
+    } else {
+      prompt("Sao chép link này và mở trên điện thoại:", shareUrl);
+    }
+  });
+}
+
+// Bật/tắt hiển thị mã QR để quét bằng camera điện thoại
+if (btnToggleQrCode) {
+  btnToggleQrCode.addEventListener("click", () => {
+    const url = apiUrlInput.value.trim() || (localStorage.getItem(STORAGE_KEYS.API_URL) || "").trim();
+    if (!url) {
+      showToast("Vui lòng nhập Web App URL trước khi tạo mã QR!", "error");
+      return;
+    }
+    const email = (gmailAccountInput ? gmailAccountInput.value.trim() : "") || (localStorage.getItem(STORAGE_KEYS.EMAIL) || "").trim();
+    let shareUrl = window.location.origin + window.location.pathname;
+    if (!shareUrl.endsWith("/")) shareUrl += "/";
+    shareUrl += `?api=${encodeURIComponent(url)}`;
+    if (email) shareUrl += `&email=${encodeURIComponent(email)}`;
+
+    if (!qrCodeContainer || !qrCodeImg) return;
+
+    if (qrCodeContainer.style.display === "none" || !qrCodeContainer.style.display) {
+      qrCodeImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(shareUrl)}`;
+      qrCodeContainer.style.display = "block";
+    } else {
+      qrCodeContainer.style.display = "none";
+    }
+  });
+}
 
 btnTestConnection.addEventListener("click", async () => {
   const url = apiUrlInput.value.trim();

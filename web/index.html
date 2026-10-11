@@ -28,18 +28,20 @@
           <span class="status-dot"></span>
           <span id="statusText">Chưa kết nối</span>
         </div>
-        <button id="btnOpenSheet" class="btn-icon btn-sheet" title="Mở bảng tính Google Sheets">📊</button>
         <button id="btnSettings" class="btn-icon" title="Cấu hình kết nối">⚙️</button>
       </div>
     </header>
 
-    <!-- THANH THÔNG BÁO ĐÃ ĐỒNG BỘ XONG -->
+    <!-- THANH THÔNG BÁO ĐÃ ĐỒNG BỘ XONG (TỰ TẮT SAU 3S VỚI BỘ ĐẾM) -->
     <div id="syncNotificationBanner" class="sync-banner" style="display: none;">
       <div class="sync-banner-content">
         <span class="sync-banner-icon">✅</span>
         <span id="syncBannerText">Đã đồng bộ thành công dữ liệu từ Google Sheets</span>
       </div>
-      <button id="btnCloseSyncBanner" class="sync-banner-close" title="Đóng thông báo">✕</button>
+      <div class="sync-banner-actions">
+        <span id="syncCountdownBadge" class="sync-countdown-badge" title="Tự động tắt sau">3s</span>
+        <button id="btnCloseSyncBanner" class="sync-banner-close" title="Đóng thông báo">✕</button>
+      </div>
     </div>
 
     <!-- BỐ CỤC 2 CỘT (TRÁI: NHẬP LIỆU & TỔNG QUAN | PHẢI: THỐNG KÊ & DANH SÁCH) -->
@@ -273,6 +275,28 @@
         
         <!-- Hộp thông báo chẩn đoán kiểm tra lỗi -->
         <div id="diagResultBox" class="diag-box"></div>
+
+        <!-- ĐỒNG BỘ ĐA THIẾT BỊ / ĐIỆN THOẠI -->
+        <div class="sync-devices-card" id="syncDevicesCard">
+          <div class="sync-devices-title">
+            <span>📱</span> <span>Tự động đồng bộ sang Điện thoại & Thiết bị khác</span>
+          </div>
+          <p class="sync-devices-desc">
+            Không cần nhập lại URL trên điện thoại! Chọn 1 trong 2 cách sau:
+          </p>
+          <div class="sync-devices-actions">
+            <button type="button" id="btnCopyShareLink" class="btn-share-link">
+              📋 Sao chép link cài đặt
+            </button>
+            <button type="button" id="btnToggleQrCode" class="btn-share-qr">
+              📲 Mã QR quét điện thoại
+            </button>
+          </div>
+          <div id="qrCodeContainer" class="qr-code-box" style="display: none;">
+            <img id="qrCodeImg" src="" alt="Mã QR Cài Đặt" class="qr-image">
+            <p class="qr-hint">Dùng camera điện thoại quét mã trên để mở trang và tự động đồng bộ ngay!</p>
+          </div>
+        </div>
 
         <p style="font-size: 0.75rem; color: #64748b; line-height: 1.5; margin-top: 10px;">
           💡 <strong>Khắc phục lỗi không tải được dữ liệu / Chưa kết nối:</strong><br>
