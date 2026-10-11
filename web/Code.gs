@@ -270,11 +270,16 @@ function addNewTransactionRecord(dateStr, category, amount, note) {
 }
 
 /**
- * Tính toán tiền tiết kiệm cộng dồn từ tháng 1 đến tháng hiện tại
+ * Tính toán tiền tiết kiệm cộng dồn (Bắt đầu tính từ tháng 11)
  */
 function calculateCumulativeSavings(ss, year, currentMonthNum) {
+  const START_SAVINGS_MONTH = 11;
+  if (currentMonthNum < START_SAVINGS_MONTH) {
+    return 0;
+  }
+
   let cumulative = 0;
-  for (let m = 1; m <= currentMonthNum; m++) {
+  for (let m = START_SAVINGS_MONTH; m <= currentMonthNum; m++) {
     const sName = "Tháng " + String(m).padStart(2, "0") + "-" + year;
     const s = ss.getSheetByName(sName);
     if (!s) continue;

@@ -248,7 +248,7 @@ function initApp() {
 
 // ================= 3. QUẢN LÝ LOẠI GIAO DỊCH: CHI TIÊU (-) / TIỀN LƯƠNG (+) =================
 
-function setEntryType(type, updateSelection = true) {
+function setEntryType(type) {
   currentEntryType = type;
 
   if (type === "expense") {
@@ -261,15 +261,9 @@ function setEntryType(type, updateSelection = true) {
     btnSubmitText.innerText = "💾 Lưu khoản chi tiêu (-)";
 
     categoryGroup.style.display = "block";
-    categoryLabel.innerText = "Danh mục chi tiêu & thu nhập";
+    categoryLabel.innerText = "Danh mục chi tiêu";
 
-    if (updateSelection) {
-      if (selectedCategoryInput.value === "Tiền lương" || !selectedCategoryInput.value) {
-        selectedCategoryInput.value = "Ăn uống";
-      }
-      highlightCategoryInGrid(selectedCategoryInput.value);
-    }
-
+    renderCategoryGrid(currentMonth, currentYear);
     renderQuickChips("expense");
   } else {
     btnTypeIncome.classList.add("active");
@@ -281,17 +275,15 @@ function setEntryType(type, updateSelection = true) {
     btnSubmitText.innerText = "💰 Lưu tiền lương (+)";
 
     categoryGroup.style.display = "block";
-    categoryLabel.innerText = "Danh mục thu nhập";
+    categoryLabel.innerText = "Danh mục tiền lương & thu nhập";
 
-    selectedCategoryInput.value = "Tiền lương";
-    highlightCategoryInGrid("Tiền lương");
-
+    renderCategoryGrid(currentMonth, currentYear);
     renderQuickChips("income");
   }
 }
 
-btnTypeExpense.addEventListener("click", () => setEntryType("expense", true));
-btnTypeIncome.addEventListener("click", () => setEntryType("income", true));
+btnTypeExpense.addEventListener("click", () => setEntryType("expense"));
+btnTypeIncome.addEventListener("click", () => setEntryType("income"));
 
 // Render các chip bấm nhanh số tiền
 function renderQuickChips(type) {
@@ -336,40 +328,37 @@ function renderQuickChips(type) {
   }
 }
 
-// Làm nổi bật danh mục đang được chọn trong lưới
-function highlightCategoryInGrid(catName) {
-  if (!categoryGrid) return;
-  categoryGrid.querySelectorAll(".category-option").forEach(opt => {
-    if (opt.getAttribute("data-category") === catName) {
-      opt.classList.add("selected");
-    } else {
-      opt.classList.remove("selected");
-    }
-  });
-}
-
-// Render lưới danh mục (gồm Tiền lương + 8 danh mục chi tiêu theo tháng)
+// Render lưới danh mục:
+// 1. Khi ở mục Tiền lương: CHỈ HIỂN THỊ DANH MỤC TIỀN LƯƠNG
+// 2. Khi ở mục Chi tiêu: CHỈ HIỂN THỊ CÁC DANH MỤC CHI TIÊU
 function renderCategoryGrid(month, year) {
   if (!categoryGrid) return;
 
-  const expenseCats = getExpenseCategoriesForMonth(month, year);
-  // Danh mục Tiền lương được đưa lên đầu để người dùng dễ dàng nhập lương hàng tháng
-  const allCats = ["Tiền lương", ...expenseCats];
+  if (currentEntryType === "income") {
+    selectedCategoryInput.value = "Tiền lương";
+    categoryGrid.innerHTML = `
+      <div class="category-option selected" data-category="Tiền lương" style="grid-column: span 4; border-color: #86efac; background: #f0fdf4;">
+        <span class="cat-icon">💰</span>
+        <span class="cat-name">Tiền lương (Thu nhập hàng tháng)</span>
+      </div>
+    `;
+    return;
+  }
 
+  // Chỉ hiển thị 8 danh mục chi tiêu theo tháng (từ tháng 10 là Bố Mẹ)
+  const expenseCats = getExpenseCategoriesForMonth(month, year);
   let currentSelected = selectedCategoryInput.value;
-  if (!currentSelected || !allCats.includes(currentSelected)) {
-    currentSelected = currentEntryType === "income" ? "Tiền lương" : expenseCats[0];
+  if (!currentSelected || currentSelected === "Tiền lương" || !expenseCats.includes(currentSelected)) {
+    currentSelected = expenseCats[0];
   }
   selectedCategoryInput.value = currentSelected;
 
-  categoryGrid.innerHTML = allCats.map(cat => {
+  categoryGrid.innerHTML = expenseCats.map(cat => {
     const isSel = cat === currentSelected;
-    const isSalary = cat === "Tiền lương";
-    const icon = CATEGORY_ICONS[cat] || (isSalary ? "💰" : "💸");
-    const salaryStyle = isSalary ? "border-color: #86efac; background: #f0fdf4;" : "";
+    const icon = CATEGORY_ICONS[cat] || "💸";
 
     return `
-      <div class="category-option ${isSel ? "selected" : ""}" data-category="${cat}" style="${salaryStyle}">
+      <div class="category-option ${isSel ? "selected" : ""}" data-category="${cat}">
         <span class="cat-icon">${icon}</span>
         <span class="cat-name">${cat}</span>
       </div>
@@ -378,15 +367,9 @@ function renderCategoryGrid(month, year) {
 
   categoryGrid.querySelectorAll(".category-option").forEach(opt => {
     opt.addEventListener("click", () => {
-      const cat = opt.getAttribute("data-category");
-      selectedCategoryInput.value = cat;
-      highlightCategoryInGrid(cat);
-
-      if (cat === "Tiền lương") {
-        setEntryType("income", false);
-      } else {
-        setEntryType("expense", false);
-      }
+      categoryGrid.querySelectorAll(".category-option").forEach(o => o.classList.remove("selected"));
+      opt.classList.add("selected");
+      selectedCategoryInput.value = opt.getAttribute("data-category");
     });
   });
 }
@@ -663,12 +646,18 @@ function loadMonthCache() {
   renderFinancialViews({ total: 0, totalIncome: 0, monthSavings: 0, cumulativeSavings: 0 });
 }
 
+const START_SAVINGS_MONTH = 11; // Tiết kiệm cộng dồn bắt đầu tính từ tháng 11
+
 /**
- * Tính toán tiền tiết kiệm cộng dồn từ các tháng trong cache local (nếu server chưa trả về)
+ * Tính toán tiền tiết kiệm cộng dồn từ các tháng trong cache local (bắt đầu tính từ tháng 11)
  */
 function computeCumulativeSavingsLocally() {
+  if (currentMonth < START_SAVINGS_MONTH) {
+    return 0;
+  }
+
   let cumulative = 0;
-  for (let m = 1; m <= currentMonth; m++) {
+  for (let m = START_SAVINGS_MONTH; m <= currentMonth; m++) {
     const raw = localStorage.getItem(getCacheKey(currentYear, m));
     if (raw) {
       try {
@@ -708,9 +697,14 @@ function renderFinancialViews(data = {}) {
 
   const monthSavings = incomeSum - expenseSum;
 
-  let cumulativeSavings = data.cumulativeSavings !== undefined && data.cumulativeSavings !== 0
-    ? data.cumulativeSavings
-    : computeCumulativeSavingsLocally();
+  let cumulativeSavings = 0;
+  if (currentMonth >= START_SAVINGS_MONTH) {
+    cumulativeSavings = (data.cumulativeSavings !== undefined && data.cumulativeSavings !== 0)
+      ? data.cumulativeSavings
+      : computeCumulativeSavingsLocally();
+  } else {
+    cumulativeSavings = 0;
+  }
 
   // 2. Hiển thị Lưới 3 chỉ số tài chính
   totalIncomeAmount.innerText = `+ ${formatCurrencyNumber(incomeSum)} ₫`;
@@ -725,13 +719,26 @@ function renderFinancialViews(data = {}) {
     monthSavingsAmount.className = "stat-value is-negative";
   }
 
-  // 3. Hiển thị Tiền tiết kiệm cộng dồn tích lũy
-  if (cumulativeSavings >= 0) {
+  // 3. Hiển thị Tiền tiết kiệm cộng dồn tích lũy (tính từ tháng 11)
+  if (currentMonth < START_SAVINGS_MONTH) {
+    cumulativeSavingsAmount.innerText = "0 ₫";
+    cumulativeSavingsAmount.className = "cum-amount";
+  } else if (cumulativeSavings >= 0) {
     cumulativeSavingsAmount.innerText = `+ ${formatCurrencyNumber(cumulativeSavings)} ₫`;
     cumulativeSavingsAmount.className = "cum-amount";
   } else {
     cumulativeSavingsAmount.innerText = `- ${formatCurrencyNumber(Math.abs(cumulativeSavings))} ₫`;
     cumulativeSavingsAmount.className = "cum-amount is-negative";
+  }
+
+  // Cập nhật nhãn phụ của khối cộng dồn
+  const cumSubtitleEl = document.getElementById("cumSubtitleText");
+  if (cumSubtitleEl) {
+    if (currentMonth < START_SAVINGS_MONTH) {
+      cumSubtitleEl.innerText = "Bắt đầu tính lũy kế từ Tháng 11";
+    } else {
+      cumSubtitleEl.innerText = `Tích lũy từ Tháng 11 đến hết Tháng ${String(currentMonth).padStart(2, "0")}`;
+    }
   }
 
   listTotalHeader.innerText = `- ${formatCurrencyNumber(expenseSum)} ₫`;
@@ -783,25 +790,25 @@ function renderTransactionsList() {
     const isIncome = item.type === "income" || item.category === "Tiền lương" || item.category === "Lương";
     const icon = CATEGORY_ICONS[item.category] || (isIncome ? "💰" : "💸");
     const amountSign = isIncome ? "+" : "-";
-    const amountClass = isIncome ? "transaction-amount is-income" : "transaction-amount";
+    const amountClass = isIncome ? "trans-pill-amount is-income" : "trans-pill-amount is-expense";
+
+    // Format ngày ngắn gọn (MM-dd)
+    let dateDisplay = item.date || "";
+    if (dateDisplay.length >= 10) {
+      dateDisplay = dateDisplay.substring(5); // Lấy MM-dd
+    }
 
     return `
-      <div class="transaction-item" data-row="${item.row || ''}">
-        <div class="transaction-info">
-          <div class="transaction-cat">
-            <span class="cat-icon-badge">${icon}</span>
-            <span class="cat-title">${escapeHtml(item.category)}</span>
-            ${isIncome ? '<span class="badge-income">+ Lương</span>' : ''}
-          </div>
-          <div class="transaction-meta">
-            <span>📅 ${escapeHtml(item.date)}</span>
-            ${item.note ? `<span>• 📝 ${escapeHtml(item.note)}</span>` : ""}
-          </div>
+      <div class="transaction-row-single" data-row="${item.row || ''}">
+        <div class="trans-single-left">
+          <span class="trans-pill-date">${escapeHtml(dateDisplay)}</span>
+          <span class="trans-pill-cat">${icon} ${escapeHtml(item.category)}</span>
         </div>
-        <div class="transaction-actions">
+        <div class="trans-single-right">
+          ${item.note ? `<span class="trans-pill-note" title="${escapeHtml(item.note)}">📝 ${escapeHtml(item.note)}</span>` : ""}
           <span class="${amountClass}">${amountSign} ${formatCurrencyNumber(item.amount)} ₫</span>
           ${item.row ? `
-            <button type="button" class="btn-del-item" title="Xóa giao dịch này" onclick="handleDeleteTransaction(${item.row})">🗑️</button>
+            <button type="button" class="trans-pill-del" title="Xóa giao dịch này" onclick="handleDeleteTransaction(${item.row})">🗑️</button>
           ` : ""}
         </div>
       </div>
@@ -928,12 +935,18 @@ function renderSalarySavingsBreakdown(income, expense, savings, cumulative) {
     <div class="salary-savings-card">
       <div class="ss-header">
         <span class="ss-title">⭐ Tiết kiệm cộng dồn</span>
-        <span class="ss-amount ${cumClass}">${cumSign} ${formatCurrencyNumber(Math.abs(cumulative))} ₫</span>
+        <span class="ss-amount ${currentMonth < START_SAVINGS_MONTH ? 'text-savings' : cumClass}">
+          ${currentMonth < START_SAVINGS_MONTH ? '0 ₫' : (cumSign + ' ' + formatCurrencyNumber(Math.abs(cumulative)) + ' ₫')}
+        </span>
       </div>
       <div class="breakdown-bar-bg">
-        <div class="breakdown-bar-fill" style="width: 100%; background: #2563eb;"></div>
+        <div class="breakdown-bar-fill" style="width: ${currentMonth < START_SAVINGS_MONTH ? '0%' : '100%'}; background: #2563eb;"></div>
       </div>
-      <div class="ss-desc">Tổng số tiền tiết kiệm tích lũy qua các tháng từ đầu năm đến hết tháng này.</div>
+      <div class="ss-desc">
+        ${currentMonth < START_SAVINGS_MONTH 
+          ? 'Bắt đầu tính lũy kế từ Tháng 11.' 
+          : `Tổng số tiền tiết kiệm tích lũy từ Tháng 11 đến hết Tháng ${String(currentMonth).padStart(2, '0')}.`}
+      </div>
     </div>
   `;
 }
