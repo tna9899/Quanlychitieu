@@ -178,7 +178,7 @@ body {
 /* ================== BỐ CỤC 2 CỘT (DASHBOARD GRID) ================== */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 440px 1fr;
+  grid-template-columns: 460px 1fr;
   gap: 20px;
   align-items: start;
   width: 100%;
@@ -187,7 +187,7 @@ body {
 
 @media (max-width: 1100px) {
   .dashboard-grid {
-    grid-template-columns: 390px 1fr;
+    grid-template-columns: 420px 1fr;
     gap: 16px;
   }
 }
@@ -967,7 +967,7 @@ body {
 }
 
 .stat-value {
-  font-size: clamp(0.85rem, 1.2vw, 1.02rem);
+  font-size: clamp(0.82rem, 1.1vw, 0.98rem);
   font-weight: 800;
   letter-spacing: -0.3px;
   white-space: nowrap;
@@ -1152,13 +1152,6 @@ body {
   border-radius: 4px;
   display: inline-block;
   margin-left: 4px;
-}
-
-@media (max-width: 500px) {
-  .finance-stats-grid {
-    grid-template-columns: 1fr;
-    gap: 6px;
-  }
 }
 
 /* ================== CƠ CẤU TIỀN LƯƠNG & TIẾT KIỆM ================== */
@@ -1513,43 +1506,71 @@ body {
   }
 
   .finance-stats-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 10px 0;
   }
 
   .stat-box {
-    padding: 6px 4px;
+    padding: 8px 10px;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .stat-income {
+    grid-column: 1 / 2;
+  }
+
+  .stat-expense {
+    grid-column: 2 / 3;
+  }
+
+  .stat-savings {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 9px 12px;
   }
 
   .stat-label {
-    font-size: 0.65rem;
+    font-size: 0.72rem;
     white-space: nowrap;
+    font-weight: 600;
   }
 
   .stat-value {
-    font-size: 0.8rem;
+    font-size: 0.92rem;
     white-space: nowrap;
-    letter-spacing: -0.4px;
+    letter-spacing: -0.2px;
+    font-weight: 800;
   }
 
   .cumulative-savings-box {
     padding: 8px 10px;
+    gap: 8px;
   }
 
   .cum-icon {
     font-size: 1.15rem;
+    flex-shrink: 0;
   }
 
   .cum-title {
     font-size: 0.72rem;
+    white-space: nowrap;
   }
 
   .cum-subtitle {
     font-size: 0.62rem;
+    white-space: nowrap;
   }
 
   .cum-amount {
-    font-size: 0.98rem;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   /* Form nhập liệu trên điện thoại */

@@ -283,9 +283,16 @@ async function initApp() {
   // Tự động đồng bộ từ Google Sheets nếu đã có URL
   if (savedUrl) {
     if (lastSyncTimeText) {
-      lastSyncTimeText.innerText = "⏳ Đang tự động cập nhật Drive...";
+      const todayStr = new Date().toDateString();
+      const lastEntryDate = localStorage.getItem("qly_last_entry_date");
+      const lastEntryTime = localStorage.getItem("qly_last_entry_time");
+      if (lastEntryDate === todayStr && lastEntryTime) {
+        lastSyncTimeText.innerText = `✅ Đã đồng bộ Drive (${lastEntryTime})`;
+      } else {
+        lastSyncTimeText.innerText = "✅ Tự động cập nhật: 00:00";
+      }
     }
-    syncMonthDataFromServer(false);
+    syncMonthDataFromServer(false, "initial");
   } else {
     if (lastSyncTimeText) {
       lastSyncTimeText.innerText = "Chưa kết nối Google Apps Script";
@@ -567,7 +574,7 @@ if (btnCloseSyncBanner) {
 
 // ================= 6. ĐỒNG BỘ DỮ LIỆU TỪ GOOGLE SHEETS =================
 
-async function syncMonthDataFromServer(isSilent = false) {
+async function syncMonthDataFromServer(isSilent = false, source = "auto") {
   const apiUrl = (localStorage.getItem(STORAGE_KEYS.API_URL) || "").trim();
   if (!apiUrl) {
     updateConnectionUI(false);
@@ -615,12 +622,40 @@ async function syncMonthDataFromServer(isSilent = false) {
       renderFinancialViews(data);
       updateConnectionUI(true);
 
-      const timeStr = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+      const todayStr = new Date().toDateString();
+      let displayTime = "00:00";
+
+      if (source === "entry") {
+        displayTime = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+        localStorage.setItem("qly_last_entry_date", todayStr);
+        localStorage.setItem("qly_last_entry_time", displayTime);
+      } else if (source === "manual") {
+        displayTime = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+        localStorage.setItem("qly_last_manual_time", displayTime);
+      } else if (source === "midnight") {
+        displayTime = "00:00";
+        localStorage.removeItem("qly_last_entry_date");
+        localStorage.removeItem("qly_last_entry_time");
+      } else {
+        // "auto", "initial", "monthNav":
+        const lastEntryDate = localStorage.getItem("qly_last_entry_date");
+        const lastEntryTime = localStorage.getItem("qly_last_entry_time");
+        if (lastEntryDate === todayStr && lastEntryTime) {
+          displayTime = lastEntryTime;
+        } else {
+          displayTime = "00:00";
+        }
+      }
+
       if (lastSyncTimeText) {
-        lastSyncTimeText.innerText = `✅ Đã đồng bộ Drive (${timeStr})`;
+        if (displayTime === "00:00") {
+          lastSyncTimeText.innerText = "✅ Tự động cập nhật: 00:00";
+        } else {
+          lastSyncTimeText.innerText = `✅ Đã đồng bộ Drive (${displayTime})`;
+        }
       }
       if (statusText) {
-        statusText.innerText = `Đã đồng bộ (${timeStr})`;
+        statusText.innerText = `Đã đồng bộ (${displayTime})`;
       }
 
       // Hiển thị thanh thông báo đã đồng bộ
@@ -647,7 +682,7 @@ async function syncMonthDataFromServer(isSilent = false) {
 }
 
 btnSyncServer.addEventListener("click", () => {
-  syncMonthDataFromServer(false);
+  syncMonthDataFromServer(false, "manual");
 });
 
 function setSyncingState(syncing) {
@@ -1085,13 +1120,13 @@ window.handleDeleteTransaction = async function(row) {
 
     if (result && result.success) {
       showToast("Đã xóa vĩnh viễn trên Google Sheets!", "success");
-      syncMonthDataFromServer(true);
+      syncMonthDataFromServer(true, "entry");
     } else {
       throw new Error((result && result.error) || "Không thể xóa dòng");
     }
   } catch (e) {
     showToast("Lỗi khi xóa: " + e.message, "error");
-    syncMonthDataFromServer(true);
+    syncMonthDataFromServer(true, "entry");
   }
 };
 
@@ -1199,7 +1234,7 @@ expenseForm.addEventListener("submit", async (e) => {
 
       // Khi server hoàn tất lưu, đồng bộ nhẹ trong nền để khớp số thứ tự dòng row
       if (isCurrentViewingMonth) {
-        await syncMonthDataFromServer(true);
+        await syncMonthDataFromServer(true, "entry");
       }
     } catch (err) {
       console.error("Lỗi gửi dữ liệu lên Drive:", err);
@@ -1460,9 +1495,7 @@ function checkDayChangeAndSync() {
       renderFilterPills(currentMonth, currentYear);
       loadMonthCache();
     }
-    syncMonthDataFromServer(true);
-  } else {
-    syncMonthDataFromServer(true);
+    syncMonthDataFromServer(true, "midnight");
   }
 }
 
@@ -1491,7 +1524,7 @@ function scheduleMidnightSync() {
       renderFilterPills(currentMonth, currentYear);
       loadMonthCache();
     }
-    syncMonthDataFromServer(true);
+    syncMonthDataFromServer(true, "midnight");
     scheduleMidnightSync(); // Tiếp tục lập lịch cho đêm tiếp theo
   }, msToMidnight);
 }
