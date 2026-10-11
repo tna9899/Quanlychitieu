@@ -38,16 +38,16 @@ body {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 12px;
+  padding: 16px 12px;
 }
 
 .app-container {
   width: 100%;
-  max-width: 480px;
+  max-width: 1180px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   padding-bottom: 40px;
 }
 
@@ -56,7 +56,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: 12px 18px;
   background: var(--card-bg);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
@@ -79,7 +79,7 @@ body {
 }
 
 .app-title-box h1 {
-  font-size: 1.05rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: #1e293b;
 }
@@ -87,6 +87,12 @@ body {
 .app-title-box p {
   font-size: 0.72rem;
   color: var(--text-muted);
+}
+
+.header-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .btn-icon {
@@ -117,26 +123,6 @@ body {
 .btn-sheet:hover {
   background: #d1fae5;
   color: #047857;
-}
-
-.btn-open-sheet-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: #ecfdf5;
-  color: #047857;
-  border: 1px solid #a7f3d0;
-  padding: 4px 10px;
-  border-radius: var(--radius-full);
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-decoration: none;
-  transition: var(--transition);
-}
-
-.btn-open-sheet-tag:hover {
-  background: #d1fae5;
-  border-color: #6ee7b7;
 }
 
 /* Status Banner */
@@ -170,6 +156,32 @@ body {
   height: 7px;
   border-radius: 50%;
   background-color: currentColor;
+}
+
+/* ================== BỐ CỤC 2 CỘT (DASHBOARD GRID) ================== */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.col-left {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 /* Summary Card */
@@ -234,7 +246,7 @@ body {
 }
 
 .summary-amount {
-  font-size: 1.9rem;
+  font-size: 1.95rem;
   font-weight: 800;
   letter-spacing: -0.5px;
   margin-bottom: 4px;
@@ -257,7 +269,7 @@ body {
   color: #ffffff;
   font-size: 0.72rem;
   font-weight: 600;
-  padding: 3px 8px;
+  padding: 4px 10px;
   border-radius: var(--radius-full);
   cursor: pointer;
   transition: var(--transition);
@@ -271,64 +283,24 @@ body {
   animation: spin 0.8s linear infinite;
 }
 
-/* Tab Navigation */
-.tab-navigation {
-  display: flex;
-  background: #f1f5f9;
-  border-radius: var(--radius-md);
-  padding: 4px;
-  gap: 4px;
-}
-
-.tab-btn {
-  flex: 1;
+/* DÒNG HIỂN THỊ TÀI KHOẢN GMAIL LIÊN KẾT */
+.connected-account-badge {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 9px 4px;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 0.82rem;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  opacity: 0.95;
+}
+
+.connected-account-badge strong {
   font-weight: 600;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: var(--transition);
-}
-
-.tab-btn:hover {
-  color: var(--text-main);
-}
-
-.tab-btn.active {
-  background: #ffffff;
-  color: var(--primary);
-  box-shadow: var(--shadow-sm);
-  font-weight: 700;
-}
-
-.tab-badge {
-  font-size: 0.68rem;
-  background: #e2e8f0;
-  color: #475569;
-  padding: 1px 6px;
-  border-radius: var(--radius-full);
-  font-weight: 700;
-}
-
-.tab-btn.active .tab-badge {
-  background: var(--primary-light);
-  color: var(--primary-dark);
-}
-
-/* Tab Contents */
-.tab-pane {
-  display: none;
-}
-
-.tab-pane.active {
-  display: block;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Card */
@@ -567,7 +539,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 480px;
+  max-height: 420px;
   overflow-y: auto;
   padding-right: 2px;
 }
@@ -637,7 +609,7 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 200px;
+  max-width: 250px;
 }
 
 .trans-right {
@@ -669,30 +641,54 @@ body {
   background: #fee2e2;
 }
 
+.btn-open-sheet-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.btn-open-sheet-tag:hover {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+}
+
 /* Category Breakdown Bars */
-.breakdown-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
 }
 
 .breakdown-item {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  background: #f8fafc;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
 }
 
 .breakdown-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 600;
 }
 
 .breakdown-bar-bg {
   width: 100%;
-  height: 7px;
+  height: 6px;
   background: #e2e8f0;
   border-radius: var(--radius-full);
   overflow: hidden;
@@ -708,7 +704,7 @@ body {
 /* Empty State */
 .empty-state {
   text-align: center;
-  padding: 30px 16px;
+  padding: 24px 16px;
   color: var(--text-muted);
   font-size: 0.85rem;
   line-height: 1.5;
@@ -730,7 +726,7 @@ body {
   }
 }
 
-/* Modal Settings */
+/* Modal Settings & Diagnostics */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -758,11 +754,13 @@ body {
   background: #ffffff;
   border-radius: var(--radius-lg);
   width: 100%;
-  max-width: 440px;
+  max-width: 480px;
   padding: 22px;
   box-shadow: var(--shadow-lg);
   transform: translateY(20px);
   transition: var(--transition);
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .modal-overlay.active .modal-content {
@@ -786,6 +784,22 @@ body {
   color: var(--text-muted);
   margin-bottom: 12px;
   line-height: 1.45;
+}
+
+.diag-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 0.75rem;
+  margin-top: 10px;
+  font-family: Consolas, Monaco, monospace;
+  line-height: 1.45;
+  display: none;
+}
+
+.diag-box.show {
+  display: block;
 }
 
 .modal-footer {

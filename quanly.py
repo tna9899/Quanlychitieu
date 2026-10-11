@@ -47,6 +47,24 @@ def get_drive_file_name_for_year(year: int) -> str:
     """Tạo tên file theo từng năm, ví dụ: 'Danh sách chi tiêu 2026'"""
     return f"{DRIVE_FILE_BASE_NAME} {year}"
 
+
+def get_categories_for_month(month: int, year: int = 2026):
+    """
+    Quy tắc danh mục:
+    - Từ tháng 10-2026 trở đi: Chuyển 'Điện nước' thành 'Bố Mẹ'
+    - Các tháng trước tháng 10: Giữ nguyên 'Điện nước'
+    """
+    if year > 2026 or (year == 2026 and month >= 10):
+        return [
+            "Ăn uống", "Di chuyển", "Mua sắm", "Giải trí",
+            "Bố Mẹ", "Cá nhân", "Tiền trọ", "Hiếu/ Hỉ"
+        ]
+    return [
+        "Ăn uống", "Di chuyển", "Mua sắm", "Giải trí",
+        "Điện nước", "Cá nhân", "Tiền trọ", "Hiếu/ Hỉ"
+    ]
+
+
 # Dữ liệu cấu hình mẫu (người dùng sẽ cung cấp qua credentials.json và token.json để bảo mật)
 DEFAULT_CREDENTIALS_INFO = {
     "installed": {
@@ -218,15 +236,9 @@ class ExpenditureApp:
         else:
             self.current_dir = os.path.dirname(os.path.abspath(__file__))
 
-        # Danh mục cố định đồng bộ giữa giao diện App và File Excel
-        self.fixed_categories = [
-            "Ăn uống", "Di chuyển", "Mua sắm", "Giải trí",
-            "Điện nước", "Cá nhân", "Tiền trọ", "Hiếu/ Hỉ"
-        ]
-        self._is_syncing = False
-        self.drive_service = None
-        self.file_id_on_drive = None
         self.current_year = datetime.now().year
+        # Danh mục tự động nhận diện theo tháng (Tháng >= 10 có 'Bố Mẹ')
+        self.fixed_categories = get_categories_for_month(datetime.now().month, self.current_year)
         
         # DataFrame quản lý các cột chi tiêu cơ bản
         self.df = pd.DataFrame(columns=["Ngày", "Danh mục", "Số tiền", "Ghi chú"])
@@ -423,6 +435,7 @@ class ExpenditureApp:
             return "break"
 
         self.date_entry.bind("<Button-1>", _open_calendar_popup)
+        self.date_entry.bind("<<DateEntrySelected>>", self._on_date_changed)
 
         # 3. Số tiền (VND)
         tk.Label(
@@ -590,6 +603,23 @@ class ExpenditureApp:
 
         # Khởi chạy kết nối và tải dữ liệu trong luồng ngầm để giao diện hiển thị ngay lập tức
         self.root.after(50, self._start_initial_sync)
+
+    def _on_date_changed(self, event=None):
+        """Tự động đổi danh mục Điện nước -> Bố Mẹ khi chọn ngày từ tháng 10 trở đi"""
+        try:
+            sel_date = self.date_entry.get_date()
+            cats = get_categories_for_month(sel_date.month, sel_date.year)
+            cur = self.category_cb.get()
+            self.category_cb['values'] = cats
+            self.fixed_categories = cats
+            if cur == "Điện nước" and "Bố Mẹ" in cats:
+                self.category_cb.set("Bố Mẹ")
+            elif cur == "Bố Mẹ" and "Điện nước" in cats:
+                self.category_cb.set("Điện nước")
+            elif cur not in cats:
+                self.category_cb.set(cats[0])
+        except Exception:
+            pass
 
     def _bind_hover(self, widget, normal_bg, hover_bg):
         """Tạo hiệu ứng hover đổi màu nền cho nút bấm"""
@@ -1048,6 +1078,12 @@ class ExpenditureApp:
                             c.number_format = '#,##0'
 
                 # 3. Khối tổng hợp rút gọn (F và G)
+                try:
+                    month_num = int(month_name.replace("Tháng ", "").split("-")[0])
+                except Exception:
+                    month_num = 10
+                current_month_cats = get_categories_for_month(month_num, target_year)
+
                 ws["F1"] = "Danh mục tổng"
                 ws["G1"] = "Tổng chi tiêu"
                 for col_letter in ["F1", "G1"]:
@@ -1056,7 +1092,7 @@ class ExpenditureApp:
                     ws[col_letter].alignment = center_align
                     ws[col_letter].border = data_borders 
 
-                for idx, cat_name in enumerate(self.fixed_categories):
+                for idx, cat_name in enumerate(current_month_cats):
                     row_num = 2 + idx
                     ws[f"F{row_num}"] = cat_name
                     ws[f"G{row_num}"] = f"=SUMIF(B:B, F{row_num}, C:C)"
@@ -1072,7 +1108,7 @@ class ExpenditureApp:
                     ws.row_dimensions[row_num].height = 20
 
                 # 4. Ô Tổng cộng tháng
-                last_cat_row = 1 + len(self.fixed_categories)
+                last_cat_row = 1 + len(current_month_cats)
                 total_row = last_cat_row + 1
 
                 ws[f"F{total_row}"] = "Tổng trong tháng"
