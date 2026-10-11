@@ -40,10 +40,31 @@ function getCategoriesForMonth(month, year) {
  */
 function getConnectedEmail() {
   try {
-    return Session.getEffectiveUser().getEmail() || Session.getActiveUser().getEmail() || "";
-  } catch (e) {
-    return "";
-  }
+    const eff = Session.getEffectiveUser().getEmail();
+    if (eff && eff.trim() !== "") return eff;
+  } catch (e) {}
+  try {
+    const act = Session.getActiveUser().getEmail();
+    if (act && act.trim() !== "") return act;
+  } catch (e) {}
+  try {
+    const now = new Date();
+    const ss = getOrCreateSpreadsheet(now.getFullYear());
+    if (ss) {
+      const owner = ss.getOwner();
+      if (owner && owner.getEmail()) return owner.getEmail();
+      const editors = ss.getEditors();
+      if (editors && editors.length > 0 && editors[0].getEmail()) {
+        return editors[0].getEmail();
+      }
+    }
+  } catch (e) {}
+  try {
+    const root = DriveApp.getRootFolder();
+    const owner = root.getOwner();
+    if (owner && owner.getEmail()) return owner.getEmail();
+  } catch (e) {}
+  return "";
 }
 
 /**
@@ -55,6 +76,7 @@ function getConnectedEmail() {
  */
 function doGet(e) {
   const action = e && e.parameter ? e.parameter.action : "";
+  const prefix = e && e.parameter ? (e.parameter.prefix || e.parameter.callback || "") : "";
   const userEmail = getConnectedEmail();
 
   // 1. Kiểm tra kết nối
@@ -68,14 +90,14 @@ function doGet(e) {
         email: userEmail,
         spreadsheetUrl: ss ? ss.getUrl() : "",
         spreadsheetId: ss ? ss.getId() : ""
-      });
+      }, prefix);
     } catch (err) {
       return createJsonResponse({
         status: "ok",
         message: "Google Apps Script đang hoạt động!",
         email: userEmail,
         error: err.toString()
-      });
+      }, prefix);
     }
   }
 
@@ -88,9 +110,9 @@ function doGet(e) {
       
       const data = getMonthData(year, month);
       data.email = userEmail;
-      return createJsonResponse(data);
+      return createJsonResponse(data, prefix);
     } catch (err) {
-      return createJsonResponse({ success: false, error: err.toString(), email: userEmail });
+      return createJsonResponse({ success: false, error: err.toString(), email: userEmail }, prefix);
     }
   }
 
@@ -111,9 +133,9 @@ function doGet(e) {
         categories: data.categories,
         email: userEmail,
         spreadsheetUrl: data.spreadsheetUrl
-      });
+      }, prefix);
     } catch (err) {
-      return createJsonResponse({ success: false, error: err.toString(), email: userEmail });
+      return createJsonResponse({ success: false, error: err.toString(), email: userEmail }, prefix);
     }
   }
 
@@ -126,9 +148,24 @@ function doGet(e) {
 
       const result = deleteTransactionRow(year, month, row);
       result.email = userEmail;
-      return createJsonResponse(result);
+      return createJsonResponse(result, prefix);
     } catch (err) {
-      return createJsonResponse({ success: false, error: err.toString(), email: userEmail });
+      return createJsonResponse({ success: false, error: err.toString(), email: userEmail }, prefix);
+    }
+  }
+
+  // 5. Thêm giao dịch qua GET (dự phòng khi POST gặp trở ngại mạng)
+  if (action === "add") {
+    try {
+      const dateStr = e.parameter.date || Utilities.formatDate(new Date(), "Asia/Ho_Chi_Minh", "yyyy-MM-dd");
+      const category = e.parameter.category || "Ăn uống";
+      const amount = Number(e.parameter.amount) || 0;
+      const note = e.parameter.note || "";
+      const addRes = addNewTransactionRecord(dateStr, category, amount, note);
+      addRes.email = userEmail;
+      return createJsonResponse(addRes, prefix);
+    } catch (err) {
+      return createJsonResponse({ success: false, error: err.toString(), email: userEmail }, prefix);
     }
   }
 
@@ -178,44 +215,9 @@ function doPost(e) {
     const amount = Number(data.amount) || 0;
     const note = data.note || "";
 
-    if (amount <= 0) {
-      throw new Error("Số tiền chi tiêu phải lớn hơn 0");
-    }
-
-    const dateParts = dateStr.split("-");
-    const year = parseInt(dateParts[0]) || new Date().getFullYear();
-    const month = String(dateParts[1] || (new Date().getMonth() + 1)).padStart(2, "0");
-    const sheetName = "Tháng " + month + "-" + year;
-
-    const ss = getOrCreateSpreadsheet(year);
-    if (!ss) {
-      throw new Error("Không thể mở hoặc tìm thấy Google Spreadsheet cho năm " + year);
-    }
-
-    const sheet = getOrCreateMonthSheet(ss, sheetName);
-
-    const nextRow = getNextAvailableDataRow(sheet);
-
-    sheet.getRange(nextRow, 1).setValue(dateStr).setNumberFormat("@");
-    sheet.getRange(nextRow, 2).setValue(category);
-    sheet.getRange(nextRow, 3).setValue(amount).setNumberFormat("#,##0");
-    sheet.getRange(nextRow, 4).setValue(note);
-
-    sheet.getRange(nextRow, 1, 1, 2).setHorizontalAlignment("center");
-    sheet.getRange(nextRow, 3).setHorizontalAlignment("right");
-    sheet.getRange(nextRow, 4).setHorizontalAlignment("left");
-
-    SpreadsheetApp.flush();
-    const newTotal = sheet.getRange("G10").getValue();
-
-    return createJsonResponse({
-      success: true,
-      message: "Đã thêm chi tiêu thành công!",
-      row: nextRow,
-      monthTotal: typeof newTotal === "number" ? newTotal : amount,
-      spreadsheetUrl: ss.getUrl(),
-      email: userEmail
-    });
+    const addRes = addNewTransactionRecord(dateStr, category, amount, note);
+    addRes.email = userEmail;
+    return createJsonResponse(addRes);
   } catch (error) {
     return createJsonResponse({
       success: false,
@@ -223,6 +225,79 @@ function doPost(e) {
       email: userEmail
     });
   }
+}
+
+/**
+ * Hàm thêm một dòng giao dịch mới vào sheet tháng tương ứng
+ */
+function addNewTransactionRecord(dateStr, category, amount, note) {
+  if (amount <= 0) {
+    throw new Error("Số tiền chi tiêu phải lớn hơn 0");
+  }
+
+  const dateParts = dateStr.split("-");
+  const year = parseInt(dateParts[0]) || new Date().getFullYear();
+  const month = String(dateParts[1] || (new Date().getMonth() + 1)).padStart(2, "0");
+  const sheetName = "Tháng " + month + "-" + year;
+
+  const ss = getOrCreateSpreadsheet(year);
+  if (!ss) {
+    throw new Error("Không thể mở hoặc tìm thấy Google Spreadsheet cho năm " + year);
+  }
+
+  const sheet = getOrCreateMonthSheet(ss, sheetName);
+  const nextRow = getNextAvailableDataRow(sheet);
+
+  sheet.getRange(nextRow, 1).setValue(dateStr).setNumberFormat("@");
+  sheet.getRange(nextRow, 2).setValue(category);
+  sheet.getRange(nextRow, 3).setValue(amount).setNumberFormat("#,##0");
+  sheet.getRange(nextRow, 4).setValue(note);
+
+  sheet.getRange(nextRow, 1, 1, 2).setHorizontalAlignment("center");
+  sheet.getRange(nextRow, 3).setHorizontalAlignment("right");
+  sheet.getRange(nextRow, 4).setHorizontalAlignment("left");
+
+  SpreadsheetApp.flush();
+  const newTotal = sheet.getRange("G10").getValue();
+
+  return {
+    success: true,
+    message: "Đã thêm chi tiêu thành công!",
+    row: nextRow,
+    monthTotal: typeof newTotal === "number" ? newTotal : amount,
+    spreadsheetUrl: ss.getUrl()
+  };
+}
+
+/**
+ * Tính toán tiền tiết kiệm cộng dồn từ tháng 1 đến tháng hiện tại
+ */
+function calculateCumulativeSavings(ss, year, currentMonthNum) {
+  let cumulative = 0;
+  for (let m = 1; m <= currentMonthNum; m++) {
+    const sName = "Tháng " + String(m).padStart(2, "0") + "-" + year;
+    const s = ss.getSheetByName(sName);
+    if (!s) continue;
+    const lRow = s.getLastRow();
+    if (lRow < 2) continue;
+    
+    // Cột B (Danh mục), Cột C (Số tiền)
+    const vals = s.getRange(2, 2, lRow - 1, 2).getValues();
+    let mIncome = 0;
+    let mExpense = 0;
+    for (let r = 0; r < vals.length; r++) {
+      const cat = String(vals[r][0] || "").trim();
+      const amt = Number(vals[r][1]) || 0;
+      if (amt <= 0) continue;
+      if (cat === "Tiền lương" || cat === "Lương" || cat === "Thu nhập") {
+        mIncome += amt;
+      } else {
+        mExpense += amt;
+      }
+    }
+    cumulative += (mIncome - mExpense);
+  }
+  return cumulative;
 }
 
 /**
@@ -234,8 +309,10 @@ function getMonthData(year, month) {
     throw new Error("Không thể kết nối đến file Google Sheets của năm " + year);
   }
 
-  const sheetName = "Tháng " + String(month).padStart(2, "0") + "-" + year;
-  const monthCategories = getCategoriesForMonth(month, year);
+  const numMonth = parseInt(month) || 10;
+  const monthStr = String(numMonth).padStart(2, "0");
+  const sheetName = "Tháng " + monthStr + "-" + year;
+  const monthCategories = getCategoriesForMonth(numMonth, year);
 
   // Lấy danh sách các sheet tháng sẵn có
   const availableMonths = [];
@@ -251,14 +328,18 @@ function getMonthData(year, month) {
 
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
+    const cumulative = calculateCumulativeSavings(ss, year, numMonth);
     return {
       success: true,
       year: year,
-      month: month,
+      month: monthStr,
       sheetName: sheetName,
       spreadsheetUrl: ss.getUrl(),
       spreadsheetId: ss.getId(),
       total: 0,
+      totalIncome: 0,
+      monthSavings: 0,
+      cumulativeSavings: cumulative,
       count: 0,
       categories: monthCategories.map(c => ({ name: c, total: 0 })),
       transactions: [],
@@ -268,35 +349,45 @@ function getMonthData(year, month) {
 
   const lastRow = sheet.getLastRow();
   const transactions = [];
+  let totalIncome = 0;
+  let totalExpense = 0;
 
   if (lastRow >= 2) {
     const rangeData = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
     for (let i = 0; i < rangeData.length; i++) {
       const row = rangeData[i];
       let dateVal = row[0];
-      const catVal = row[1];
+      const catVal = String(row[1] || "").trim();
       const amountVal = Number(row[2]) || 0;
       const noteVal = row[3] ? String(row[3]) : "";
 
-      if (amountVal > 0 || (catVal && catVal.toString().trim() !== "")) {
+      if (amountVal > 0 || catVal !== "") {
         if (dateVal instanceof Date) {
           dateVal = Utilities.formatDate(dateVal, "Asia/Ho_Chi_Minh", "yyyy-MM-dd");
         } else {
           dateVal = String(dateVal || "").trim();
         }
 
+        const isSalary = (catVal === "Tiền lương" || catVal === "Lương" || catVal === "Thu nhập");
+        if (isSalary) {
+          totalIncome += amountVal;
+        } else {
+          totalExpense += amountVal;
+        }
+
         transactions.push({
           row: i + 2,
           date: dateVal,
-          category: String(catVal || "").trim(),
+          category: catVal || "Ăn uống",
           amount: amountVal,
-          note: noteVal
+          note: noteVal,
+          type: isSalary ? "income" : "expense"
         });
       }
     }
   }
 
-  // Đọc danh mục tổng hợp từ F2:G9 (hoặc dùng danh mục theo tháng)
+  // Đọc danh mục tổng hợp chi tiêu từ F2:G9
   const catSummary = [];
   try {
     const catRange = sheet.getRange("F2:G9").getValues();
@@ -307,25 +398,34 @@ function getMonthData(year, month) {
     }
   } catch (e) {
     monthCategories.forEach(c => {
-      const sum = transactions.filter(t => t.category === c).reduce((acc, t) => acc + t.amount, 0);
+      const sum = transactions.filter(t => t.category === c && t.type !== "income").reduce((acc, t) => acc + t.amount, 0);
       catSummary.push({ name: c, total: sum });
     });
   }
 
   // Đọc ô tổng chi tiêu G10
-  let totalVal = sheet.getRange("G10").getValue();
-  if (typeof totalVal !== "number" || isNaN(totalVal)) {
-    totalVal = transactions.reduce((acc, t) => acc + t.amount, 0);
+  let g10Total = sheet.getRange("G10").getValue();
+  if (typeof g10Total === "number" && !isNaN(g10Total) && g10Total > 0) {
+    totalExpense = g10Total;
   }
+
+  // Tính số tiền dư trong tháng (tiết kiệm tháng) = Lương (+) - Chi tiêu (-)
+  const monthSavings = totalIncome - totalExpense;
+
+  // Tính số tiền tiết kiệm cộng dồn từ tháng 1 đến tháng hiện tại
+  const cumulativeSavings = calculateCumulativeSavings(ss, year, numMonth);
 
   return {
     success: true,
     year: year,
-    month: month,
+    month: monthStr,
     sheetName: sheetName,
     spreadsheetUrl: ss.getUrl(),
     spreadsheetId: ss.getId(),
-    total: totalVal,
+    total: totalExpense,                   // Tổng chi tiêu (-)
+    totalIncome: totalIncome,             // Tiền lương / Thu nhập (+)
+    monthSavings: monthSavings,           // Số tiền dư trong tháng (tiết kiệm tháng)
+    cumulativeSavings: cumulativeSavings, // Tiền tiết kiệm cộng dồn hàng tháng
     count: transactions.length,
     categories: catSummary,
     transactions: transactions,
@@ -452,18 +552,27 @@ function getOrCreateMonthSheet(ss, sheetName) {
     sheet.setRowHeight(row, 22);
   }
 
-  // 4. Ô Tổng trong tháng
-  sheet.getRange(10, 6).setValue("Tổng trong tháng").setFontWeight("bold").setFontColor("#D32F2F").setHorizontalAlignment("center");
+  // 4. Ô Tổng chi tiêu trong tháng
+  sheet.getRange(10, 6).setValue("Tổng chi tiêu (-)").setFontWeight("bold").setFontColor("#D32F2F").setHorizontalAlignment("center");
   sheet.getRange(10, 7).setFormula("=SUM(G2:G9)").setFontWeight("bold").setFontColor("#D32F2F").setNumberFormat("#,##0").setHorizontalAlignment("right");
   sheet.setRowHeight(10, 26);
+
+  // 5. Khối tài chính: Tiền lương (+) và Tiết kiệm
+  sheet.getRange(12, 6).setValue("Tiền lương (+)").setFontWeight("bold").setFontColor("#16A34A").setHorizontalAlignment("center");
+  sheet.getRange(12, 7).setFormula("=SUMIF(B:B, \"Tiền lương\", C:C)").setFontWeight("bold").setFontColor("#16A34A").setNumberFormat("#,##0").setHorizontalAlignment("right");
+  sheet.setRowHeight(12, 24);
+
+  sheet.getRange(13, 6).setValue("Tiết kiệm tháng").setFontWeight("bold").setFontColor("#0D9488").setHorizontalAlignment("center");
+  sheet.getRange(13, 7).setFormula("=G12-G10").setFontWeight("bold").setFontColor("#0D9488").setNumberFormat("#,##0").setHorizontalAlignment("right");
+  sheet.setRowHeight(13, 24);
 
   sheet.setColumnWidth(1, 110);
   sheet.setColumnWidth(2, 120);
   sheet.setColumnWidth(3, 130);
   sheet.setColumnWidth(4, 220);
   sheet.setColumnWidth(5, 30);
-  sheet.setColumnWidth(6, 140);
-  sheet.setColumnWidth(7, 140);
+  sheet.setColumnWidth(6, 150);
+  sheet.setColumnWidth(7, 150);
 
   return sheet;
 }
@@ -482,9 +591,14 @@ function getNextAvailableDataRow(sheet) {
 }
 
 /**
- * Tiện ích trả về JSON
+ * Tiện ích trả về JSON hoặc JSONP (nếu có prefix / callback)
  */
-function createJsonResponse(data) {
-  return ContentService.createTextOutput(JSON.stringify(data))
+function createJsonResponse(data, prefix) {
+  const jsonStr = JSON.stringify(data);
+  if (prefix && typeof prefix === "string" && prefix.trim() !== "") {
+    return ContentService.createTextOutput(prefix + "(" + jsonStr + ")")
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(jsonStr)
     .setMimeType(ContentService.MimeType.JSON);
 }

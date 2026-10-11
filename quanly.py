@@ -237,8 +237,8 @@ class ExpenditureApp:
             self.current_dir = os.path.dirname(os.path.abspath(__file__))
 
         self.current_year = datetime.now().year
-        # Danh mục tự động nhận diện theo tháng (Tháng >= 10 có 'Bố Mẹ')
-        self.fixed_categories = get_categories_for_month(datetime.now().month, self.current_year)
+        # Danh mục gồm Tiền lương (+) và các danh mục chi tiêu theo tháng
+        self.fixed_categories = ["Tiền lương"] + get_categories_for_month(datetime.now().month, self.current_year)
         
         # DataFrame quản lý các cột chi tiêu cơ bản
         self.df = pd.DataFrame(columns=["Ngày", "Danh mục", "Số tiền", "Ghi chú"])
@@ -376,7 +376,7 @@ class ExpenditureApp:
             style="Custom.TCombobox"
         )
         self.category_cb.pack(fill=tk.X, pady=(0, 10))
-        self.category_cb.current(0)
+        self.category_cb.current(1 if len(self.fixed_categories) > 1 else 0)
 
         # Chặn bôi đen khi click chọn hoặc chuyển focus trong danh mục chi tiêu
         def _clear_cb_selection(e=None):
@@ -608,7 +608,8 @@ class ExpenditureApp:
         """Tự động đổi danh mục Điện nước -> Bố Mẹ khi chọn ngày từ tháng 10 trở đi"""
         try:
             sel_date = self.date_entry.get_date()
-            cats = get_categories_for_month(sel_date.month, sel_date.year)
+            expense_cats = get_categories_for_month(sel_date.month, sel_date.year)
+            cats = ["Tiền lương"] + expense_cats
             cur = self.category_cb.get()
             self.category_cb['values'] = cats
             self.fixed_categories = cats
@@ -617,7 +618,7 @@ class ExpenditureApp:
             elif cur == "Bố Mẹ" and "Điện nước" in cats:
                 self.category_cb.set("Điện nước")
             elif cur not in cats:
-                self.category_cb.set(cats[0])
+                self.category_cb.set(cats[1] if len(cats) > 1 else cats[0])
         except Exception:
             pass
 
@@ -1111,7 +1112,7 @@ class ExpenditureApp:
                 last_cat_row = 1 + len(current_month_cats)
                 total_row = last_cat_row + 1
 
-                ws[f"F{total_row}"] = "Tổng trong tháng"
+                ws[f"F{total_row}"] = "Tổng chi tiêu (-)"
                 ws[f"G{total_row}"] = f"=SUM(G2:G{last_cat_row})" 
                 
                 ws[f"F{total_row}"].font = total_font
@@ -1123,6 +1124,35 @@ class ExpenditureApp:
                 ws[f"G{total_row}"].alignment = right_align 
                 ws[f"G{total_row}"].number_format = '#,##0'
                 ws.row_dimensions[total_row].height = 22
+
+                # 5. Khối tài chính: Tiền lương (+) và Tiết kiệm tháng
+                salary_row = total_row + 2
+                savings_row = total_row + 3
+
+                salary_font = Font(name="Segoe UI", size=9, bold=True, color="16A34A")
+                savings_font = Font(name="Segoe UI", size=9, bold=True, color="0D9488")
+
+                ws[f"F{salary_row}"] = "Tiền lương (+)"
+                ws[f"G{salary_row}"] = '=SUMIF(B:B, "Tiền lương", C:C)'
+                ws[f"F{salary_row}"].font = salary_font
+                ws[f"F{salary_row}"].border = data_borders
+                ws[f"F{salary_row}"].alignment = center_align
+                ws[f"G{salary_row}"].font = salary_font
+                ws[f"G{salary_row}"].border = data_borders
+                ws[f"G{salary_row}"].alignment = right_align
+                ws[f"G{salary_row}"].number_format = '#,##0'
+                ws.row_dimensions[salary_row].height = 20
+
+                ws[f"F{savings_row}"] = "Tiết kiệm tháng"
+                ws[f"G{savings_row}"] = f'=G{salary_row}-G{total_row}'
+                ws[f"F{savings_row}"].font = savings_font
+                ws[f"F{savings_row}"].border = data_borders
+                ws[f"F{savings_row}"].alignment = center_align
+                ws[f"G{savings_row}"].font = savings_font
+                ws[f"G{savings_row}"].border = data_borders
+                ws[f"G{savings_row}"].alignment = right_align
+                ws[f"G{savings_row}"].number_format = '#,##0'
+                ws.row_dimensions[savings_row].height = 20
 
                 # 5. Biểu đồ tròn
                 pie = PieChart()

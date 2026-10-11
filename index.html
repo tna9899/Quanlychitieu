@@ -33,11 +33,20 @@
       </div>
     </header>
 
+    <!-- THANH THÔNG BÁO ĐÃ ĐỒNG BỘ XONG -->
+    <div id="syncNotificationBanner" class="sync-banner" style="display: none;">
+      <div class="sync-banner-content">
+        <span class="sync-banner-icon">✅</span>
+        <span id="syncBannerText">Đã đồng bộ thành công dữ liệu từ Google Sheets</span>
+      </div>
+      <button id="btnCloseSyncBanner" class="sync-banner-close" title="Đóng thông báo">✕</button>
+    </div>
+
     <!-- BỐ CỤC 2 CỘT (TRÁI: NHẬP LIỆU & TỔNG QUAN | PHẢI: THỐNG KÊ & DANH SÁCH) -->
     <div class="dashboard-grid">
       <!-- CỘT TRÁI (LEFT) -->
       <div class="col-left">
-        <!-- Thẻ Tổng quan tháng & Tài khoản Gmail -->
+        <!-- Thẻ Tổng quan Tài chính (Lương +, Chi tiêu -, Tiết kiệm, Cộng dồn) -->
         <section class="summary-card">
           <div class="summary-header">
             <div class="month-switcher">
@@ -50,41 +59,84 @@
               <span id="syncText">Đồng bộ</span>
             </button>
           </div>
-          <div class="summary-amount" id="totalMonthAmount">0 ₫</div>
-          <div class="summary-footer">
-            <span id="summarySubtitle">Tổng chi tiêu tháng</span>
-            <span id="entryCountText">0 khoản chi</span>
+
+          <!-- Lưới 3 chỉ số tài chính tháng: Lương (+), Chi tiêu (-), Tiết kiệm (=) -->
+          <div class="finance-stats-grid">
+            <div class="stat-box stat-income">
+              <div class="stat-label">🟢 Tiền lương (+)</div>
+              <div class="stat-value text-green" id="totalIncomeAmount">+ 0 ₫</div>
+            </div>
+            <div class="stat-box stat-expense">
+              <div class="stat-label">🔴 Chi tiêu (-)</div>
+              <div class="stat-value text-red" id="totalExpenseAmount">- 0 ₫</div>
+            </div>
+            <div class="stat-box stat-savings">
+              <div class="stat-label">💰 Tiết kiệm tháng</div>
+              <div class="stat-value" id="monthSavingsAmount">0 ₫</div>
+            </div>
           </div>
+
+          <!-- DÒNG TIẾT KIỆM CỘNG DỒN HÀNG THÁNG -->
+          <div class="cumulative-savings-box">
+            <div class="cum-left">
+              <span class="cum-icon">🏦</span>
+              <div>
+                <div class="cum-title">Tiết kiệm cộng dồn tích lũy</div>
+                <div class="cum-subtitle">Tính từ đầu năm đến hết tháng này</div>
+              </div>
+            </div>
+            <div class="cum-amount" id="cumulativeSavingsAmount">0 ₫</div>
+          </div>
+
+          <div class="summary-footer">
+            <span id="summarySubtitle">Thống kê tháng hiện tại</span>
+            <span id="entryCountText">0 giao dịch trên Drive</span>
+          </div>
+
           <!-- HIỂN THỊ TÀI KHOẢN GMAIL LIÊN KẾT BÊN DƯỚI PHẦN ĐỒNG BỘ -->
           <div class="connected-account-badge" id="connectedAccountBadge">
-            <span>📧 Tài khoản Drive:</span>
-            <strong id="connectedEmailText">Chưa kết nối</strong>
+            <div class="account-badge-left">
+              <span>📧 Tài khoản Drive:</span>
+              <strong id="connectedEmailText">Chưa kết nối</strong>
+            </div>
+            <button type="button" id="btnQuickEditEmail" class="btn-badge-action" title="Nhập hoặc đổi tài khoản Gmail">✏️ Đổi</button>
           </div>
         </section>
 
-        <!-- Form Thêm Chi Tiêu Mới -->
+        <!-- Form Thêm Chi Tiêu / Tiền Lương Mới -->
         <main class="card">
           <div class="card-title">
-            <span>✏️</span>
-            <span>Nhập khoản chi tiêu mới</span>
+            <span id="formTitleIcon">✏️</span>
+            <span id="formTitleText">Nhập giao dịch tài chính</span>
+          </div>
+
+          <!-- Phím chuyển đổi: Khoản chi tiêu (-) HOẶC Tiền lương (+) -->
+          <div class="entry-type-switch">
+            <button type="button" class="type-switch-btn active" id="btnTypeExpense" data-type="expense">
+              <span class="type-dot dot-red">●</span> Khoản chi tiêu (-)
+            </button>
+            <button type="button" class="type-switch-btn" id="btnTypeIncome" data-type="income">
+              <span class="type-dot dot-green">●</span> Tiền lương / Thu nhập (+)
+            </button>
           </div>
 
           <form id="expenseForm">
-            <!-- Ngày chi tiêu -->
+            <!-- Ngày giao dịch -->
             <div class="form-group">
-              <label class="form-label" for="expenseDate">Ngày chi tiêu</label>
+              <label class="form-label" for="expenseDate">Ngày ghi nhận</label>
               <input type="date" id="expenseDate" class="input-control" required>
             </div>
 
             <!-- Số tiền -->
             <div class="form-group">
-              <label class="form-label" for="expenseAmount">Số tiền (VNĐ)</label>
+              <label class="form-label" for="expenseAmount" id="amountLabel">Số tiền chi tiêu (VNĐ)</label>
               <div class="amount-input-wrapper">
+                <span id="amountSignBadge" class="amount-sign-badge sign-minus">-</span>
                 <input type="text" id="expenseAmount" class="input-control amount-input" placeholder="0" inputmode="numeric" required autocomplete="off">
                 <span class="currency-badge">₫</span>
               </div>
               <!-- Phím bấm số tiền nhanh -->
-              <div class="quick-chips">
+              <div class="quick-chips" id="quickChipsContainer">
                 <button type="button" class="chip-btn" data-add="10000">+10k</button>
                 <button type="button" class="chip-btn" data-add="20000">+20k</button>
                 <button type="button" class="chip-btn" data-add="50000">+50k</button>
@@ -95,9 +147,9 @@
               </div>
             </div>
 
-            <!-- Danh mục (Tự động chuyển 'Bố Mẹ' cho Tháng >= 10) -->
-            <div class="form-group">
-              <label class="form-label">Danh mục chi tiêu</label>
+            <!-- Danh mục (Tự động chuyển 'Bố Mẹ' cho Tháng >= 10, hoặc 'Tiền lương') -->
+            <div class="form-group" id="categoryGroup">
+              <label class="form-label" id="categoryLabel">Danh mục chi tiêu</label>
               <div class="category-grid" id="categoryGrid">
                 <!-- Sẽ được app.js render động theo tháng đã chọn -->
               </div>
@@ -112,7 +164,7 @@
 
             <!-- Nút Lưu -->
             <button type="submit" id="btnSubmit" class="btn-submit">
-              <span id="btnSubmitText">💾 Lưu & Đồng bộ lên Drive</span>
+              <span id="btnSubmitText">💾 Lưu khoản chi tiêu (-)</span>
               <div id="btnSpinner" class="spinner" style="display: none;"></div>
             </button>
           </form>
@@ -133,14 +185,14 @@
           </div>
         </section>
 
-        <!-- Thẻ Toàn Bộ Danh Sách Chi Tiêu Trong Tháng -->
+        <!-- Thẻ Toàn Bộ Danh Sách Giao Dịch Trong Tháng -->
         <section class="card">
           <div class="card-title" style="justify-content: space-between;">
             <div style="display: flex; align-items: center; gap: 8px;">
               <span>📋</span>
-              <span id="listTitleMonth">Các khoản chi trong tháng</span>
+              <span id="listTitleMonth">Các khoản thu chi trong tháng</span>
             </div>
-            <span id="listTotalHeader" style="font-size: 0.9rem; color: #b91c1c; font-weight: 700;">0 ₫</span>
+            <span id="listTotalHeader" style="font-size: 0.9rem; color: #b91c1c; font-weight: 700;">- 0 ₫</span>
           </div>
 
           <!-- Thanh liên kết Google Sheets & Trạng thái cập nhật -->
@@ -160,7 +212,7 @@
           <!-- Danh sách giao dịch -->
           <div class="transactions-list" id="transactionsContainer">
             <div class="empty-state">
-              <p>Đang tải dữ liệu chi tiêu từ Google Sheets...</p>
+              <p>Đang tải dữ liệu từ Google Sheets...</p>
             </div>
           </div>
         </section>
@@ -181,12 +233,20 @@
           <label class="form-label" for="apiUrlInput">Web App URL</label>
           <input type="url" id="apiUrlInput" class="input-control" placeholder="https://script.google.com/macros/s/.../exec">
         </div>
+
+        <div class="form-group">
+          <label class="form-label" for="gmailAccountInput">Tài khoản Gmail Drive (Tự động hoặc nhập thủ công)</label>
+          <input type="email" id="gmailAccountInput" class="input-control" placeholder="vidu@gmail.com">
+          <small style="color: #64748b; font-size: 0.75rem; margin-top: 3px; display: block;">
+            💡 Hệ thống tự nhận diện từ Google Sheets khi kiểm tra kết nối, hoặc bạn có thể nhập email tài khoản của bạn tại đây.
+          </small>
+        </div>
         
         <!-- Hộp thông báo chẩn đoán kiểm tra lỗi -->
         <div id="diagResultBox" class="diag-box"></div>
 
         <p style="font-size: 0.75rem; color: #64748b; line-height: 1.5; margin-top: 10px;">
-          💡 <strong>Khắc phục lỗi không tải được dữ liệu:</strong><br>
+          💡 <strong>Khắc phục lỗi không tải được dữ liệu / Chưa kết nối:</strong><br>
           1. Vào Google Sheets -> <em>Tiện ích mở rộng -> Apps Script</em> -> Dán code mới nhất từ <code>web/Code.gs</code>.<br>
           2. Bấm <em>Triển khai -> Quản lý các bản triển khai -> Chỉnh sửa (✏️)</em> -> Chọn <strong>Phiên bản mới (New version)</strong>.<br>
           3. Đảm bảo mục <strong>Ai có quyền truy cập</strong> là <strong>Bất kỳ ai (Anyone)</strong>.

@@ -864,3 +864,267 @@ body {
 .toast.toast-error {
   background: #dc2626;
 }
+
+/* ================== THANH THÔNG BÁO ĐÃ ĐỒNG BỘ ================== */
+.sync-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: #ecfdf5;
+  border: 1.5px solid #a7f3d0;
+  border-radius: var(--radius-md);
+  color: #065f46;
+  font-size: 0.82rem;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.08);
+  animation: slideDown 0.3s ease-out forwards;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sync-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sync-banner-icon {
+  font-size: 1.1rem;
+}
+
+.sync-banner-close {
+  background: none;
+  border: none;
+  color: #047857;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: var(--transition);
+}
+
+.sync-banner-close:hover {
+  background: #d1fae5;
+}
+
+/* ================== LƯỚI 3 CHỈ SỐ TÀI CHÍNH THÁNG ================== */
+.finance-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 12px 0 12px 0;
+}
+
+.stat-box {
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.stat-label {
+  font-size: 0.68rem;
+  opacity: 0.9;
+  font-weight: 600;
+}
+
+.stat-value {
+  font-size: 1.02rem;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stat-income .stat-value {
+  color: #86efac;
+}
+
+.stat-expense .stat-value {
+  color: #fca5a5;
+}
+
+.stat-savings .stat-value {
+  color: #ffffff;
+}
+
+.stat-savings .stat-value.is-negative {
+  color: #fca5a5;
+}
+
+.stat-savings .stat-value.is-positive {
+  color: #86efac;
+}
+
+/* ================== DÒNG TIẾT KIỆM CỘNG DỒN HÀNG THÁNG ================== */
+.cumulative-savings-box {
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #1e293b;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.cum-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cum-icon {
+  font-size: 1.35rem;
+}
+
+.cum-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.cum-subtitle {
+  font-size: 0.65rem;
+  color: #64748b;
+}
+
+.cum-amount {
+  font-size: 1.18rem;
+  font-weight: 800;
+  color: #059669;
+}
+
+.cum-amount.is-negative {
+  color: #dc2626;
+}
+
+/* ================== TÀI KHOẢN GMAIL BADGE ================== */
+.account-badge-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.btn-badge-action {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: #ffffff;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-badge-action:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* ================== CÔNG TẮC LOẠI GIAO DỊCH (CHI TIÊU / TIỀN LƯƠNG) ================== */
+.entry-type-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: var(--radius-md);
+}
+
+.type-switch-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.type-switch-btn.active[data-type="expense"] {
+  background: #ffffff;
+  color: #dc2626;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.type-switch-btn.active[data-type="income"] {
+  background: #ffffff;
+  color: #16a34a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.type-dot {
+  font-size: 0.85rem;
+}
+
+.dot-red { color: #ef4444; }
+.dot-green { color: #10b981; }
+
+.amount-sign-badge {
+  position: absolute;
+  left: 14px;
+  font-size: 1.2rem;
+  font-weight: 800;
+  z-index: 2;
+}
+
+.amount-sign-badge.sign-minus {
+  color: #ef4444;
+}
+
+.amount-sign-badge.sign-plus {
+  color: #16a34a;
+}
+
+.amount-input-wrapper .amount-input {
+  padding-left: 36px;
+}
+
+/* GIAO DỊCH TIỀN LƯƠNG TRONG DANH SÁCH */
+.transaction-amount.is-income {
+  color: #16a34a !important;
+}
+
+.badge-income {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-left: 4px;
+}
+
+@media (max-width: 500px) {
+  .finance-stats-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}
