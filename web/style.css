@@ -1683,4 +1683,25 @@ body {
     padding: 16px;
     width: 95%;
   }
+
+  .app-footer {
+    padding: 14px 0 16px 0;
+    font-size: 0.76rem;
+  }
+}
+
+/* ================== DÒNG BẢN QUYỀN / TÁC GIẢ Ở CUỐI TRANG ================== */
+.app-footer {
+  text-align: center;
+  padding: 20px 0 10px 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  letter-spacing: 0.3px;
+  width: 100%;
+}
+
+.app-footer em {
+  font-style: italic;
+  font-weight: 500;
+  opacity: 0.85;
 }
